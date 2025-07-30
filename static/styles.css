@@ -1,3 +1,4 @@
+
 /* Reset et styles de base */
 * {
     margin: 0;
@@ -1371,13 +1372,13 @@ body::before {
     animation-delay: 0.2s;
 }
 
-/* Styles responsive améliorés */
+/* Styles responsive */
 @media (max-width: 1200px) {
     .crypto-grid {
         grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
         gap: 20px;
     }
-
+    
     .toolbar, #main-content {
         padding-left: 24px;
         padding-right: 24px;
@@ -1402,30 +1403,30 @@ body::before {
         flex-direction: column;
         gap: 16px;
     }
-
+    
     .nav-brand h1 {
         font-size: 1.5rem;
         text-align: center;
     }
-
+    
     .nav-menu {
         flex-wrap: wrap;
         justify-content: center;
         gap: 6px;
     }
-
+    
     .nav-btn {
         padding: 6px 12px;
         font-size: 0.8125rem;
     }
-
+    
     .toolbar {
         flex-direction: column;
         align-items: stretch;
         padding: 0 20px;
         gap: 16px;
     }
-
+    
     .toolbar-actions {
         justify-content: space-between;
         align-items: center;
@@ -1435,30 +1436,30 @@ body::before {
         right: -8px;
         min-width: 180px;
     }
-
+    
     .market-overview {
         grid-template-columns: 1fr;
         margin: 0 20px 24px;
     }
-
+    
     #main-content {
         padding: 0 20px 24px;
     }
-
+    
     .modal-content {
         width: 95%;
         margin: 2% auto;
         padding: 24px 20px;
     }
-
+    
     .portfolio-summary {
         grid-template-columns: 1fr;
     }
-
+    
     .portfolio-actions {
         flex-direction: column;
     }
-
+    
     .notifications-container {
         left: 10px;
         right: 10px;
@@ -1484,24 +1485,24 @@ body::before {
     .crypto-card {
         padding: 20px;
     }
-
+    
     .nav-menu {
         width: 100%;
     }
-
+    
     .nav-btn {
         flex: 1;
         min-width: 100px;
     }
-
+    
     .tab-buttons {
         flex-direction: column;
     }
-
+    
     .converter {
         flex-direction: column;
     }
-
+    
     .card-actions {
         flex-direction: column;
     }

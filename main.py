@@ -38,7 +38,7 @@ async def fetch_historical_data():
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
-
+                        
                         if crypto_id not in crypto_data:
                             crypto_data[crypto_id] = {
                                 "prices": [],
@@ -48,7 +48,7 @@ async def fetch_historical_data():
                                 "current": {},
                                 "stats": {}
                             }
-
+                        
                         # Traiter les données historiques
                         prices = data.get("prices", [])
                         for price_data in prices:
@@ -56,9 +56,9 @@ async def fetch_historical_data():
                             price = price_data[1]
                             crypto_data[crypto_id]["historical_prices"].append(price)
                             crypto_data[crypto_id]["historical_timestamps"].append(timestamp.isoformat())
-
+                        
                         print(f"Données historiques chargées pour {crypto_id}: {len(prices)} points")
-
+                        
                 await asyncio.sleep(0.1)  # Éviter de surcharger l'API
             except Exception as e:
                 print(f"Erreur lors de la récupération des données historiques pour {crypto_id}: {e}")
@@ -72,7 +72,7 @@ async def fetch_crypto_data():
                 if response.status == 200:
                     data = await response.json()
                     timestamp = datetime.now().isoformat()
-
+                    
                     for crypto_id, crypto_info in data.items():
                         if crypto_id not in crypto_data:
                             crypto_data[crypto_id] = {
@@ -83,34 +83,34 @@ async def fetch_crypto_data():
                                 "current": {},
                                 "stats": {}
                             }
-
+                        
                         # Ajouter le prix actuel à l'historique temps réel
                         crypto_data[crypto_id]["prices"].append(crypto_info.get("usd", 0))
                         crypto_data[crypto_id]["timestamps"].append(timestamp)
                         crypto_data[crypto_id]["current"] = crypto_info
-
+                        
                         # Calculer des statistiques
                         current_price = crypto_info.get("usd", 0)
                         historical_prices = crypto_data[crypto_id]["historical_prices"]
-
+                        
                         if historical_prices:
                             year_ago_price = historical_prices[0] if historical_prices else current_price
                             year_change = ((current_price - year_ago_price) / year_ago_price * 100) if year_ago_price > 0 else 0
                             max_year = max(historical_prices) if historical_prices else current_price
                             min_year = min(historical_prices) if historical_prices else current_price
-
+                            
                             crypto_data[crypto_id]["stats"] = {
                                 "year_change": year_change,
                                 "year_high": max_year,
                                 "year_low": min_year,
                                 "market_cap": crypto_info.get("usd_market_cap", 0)
                             }
-
+                        
                         # Garder les 1000 derniers points pour le temps réel
                         if len(crypto_data[crypto_id]["prices"]) > 1000:
                             crypto_data[crypto_id]["prices"] = crypto_data[crypto_id]["prices"][-1000:]
                             crypto_data[crypto_id]["timestamps"] = crypto_data[crypto_id]["timestamps"][-1000:]
-
+                    
                     return data
         except Exception as e:
             print(f"Erreur lors de la récupération des données: {e}")
@@ -124,22 +124,13 @@ async def broadcast_data():
             "data": crypto_data,
             "timestamp": datetime.now().isoformat()
         }
-        
-        # S'assurer que le message est sérialisable en JSON
-        try:
-            json_message = json.dumps(message, default=str)
-        except Exception as e:
-            print(f"Erreur lors de la sérialisation JSON: {e}")
-            return
-            
         disconnected = []
         for connection in connections:
             try:
-                await connection.send_text(json_message)
-            except Exception as e:
-                print(f"Erreur lors de l'envoi WebSocket: {e}")
+                await connection.send_text(json.dumps(message))
+            except:
                 disconnected.append(connection)
-
+        
         # Nettoyer les connexions fermées
         for connection in disconnected:
             connections.remove(connection)
@@ -148,14 +139,11 @@ async def crypto_updater():
     """Tâche en arrière-plan pour mettre à jour les données crypto"""
     # Charger les données historiques au démarrage
     await fetch_historical_data()
-
+    
     while True:
-        try:
-            await fetch_crypto_data()
-            await broadcast_data()
-        except Exception as e:
-            print(f"Erreur dans crypto_updater: {e}")
-        await asyncio.sleep(5)  # Mise à jour toutes les 5 secondes pour éviter de surcharger l'API
+        await fetch_crypto_data()
+        await broadcast_data()
+        await asyncio.sleep(1)  # Mise à jour chaque seconde
 
 @app.on_event("startup")
 async def startup_event():
@@ -171,7 +159,7 @@ async def get_dashboard():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connections.append(websocket)
-
+    
     try:
         # Envoyer les données actuelles au nouveau client
         if crypto_data:
@@ -180,22 +168,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 "data": crypto_data,
                 "timestamp": datetime.now().isoformat()
             }
-            try:
-                json_message = json.dumps(message, default=str)
-                await websocket.send_text(json_message)
-            except Exception as e:
-                print(f"Erreur lors de l'envoi initial WebSocket: {e}")
-
+            await websocket.send_text(json.dumps(message))
+        
         while True:
             # Garder la connexion ouverte
             await websocket.receive_text()
     except WebSocketDisconnect:
-        if websocket in connections:
-            connections.remove(websocket)
-    except Exception as e:
-        print(f"Erreur WebSocket: {e}")
-        if websocket in connections:
-            connections.remove(websocket)
+        connections.remove(websocket)
 
 @app.get("/api/crypto/{crypto_id}")
 async def get_crypto_data(crypto_id: str):
