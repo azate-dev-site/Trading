@@ -118,6 +118,9 @@ function updateCryptoData(data) {
     const grid = document.getElementById('crypto-grid');
     if (!grid) return;
     
+    // Mettre à jour les données globales
+    crypto_data = data;
+    
     for (const [cryptoId, cryptoInfo] of Object.entries(data)) {
         let card = document.getElementById(`card-${cryptoId}`);
         
@@ -142,8 +145,35 @@ function createCryptoCard(cryptoId, cryptoInfo) {
             <div class="change" id="change-${cryptoId}">0.00%</div>
         </div>
         <div class="price" id="price-${cryptoId}">$0.00</div>
-        <div class="crypto-info">
-            <div class="volume" id="volume-${cryptoId}">Volume 24h: $0</div>
+        <div class="crypto-stats">
+            <div class="stat-row">
+                <span class="stat-label">24h:</span>
+                <span class="stat-value" id="change-24h-${cryptoId}">0.00%</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">1 an:</span>
+                <span class="stat-value" id="change-year-${cryptoId}">0.00%</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Plus haut:</span>
+                <span class="stat-value" id="year-high-${cryptoId}">$0.00</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Plus bas:</span>
+                <span class="stat-value" id="year-low-${cryptoId}">$0.00</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Volume 24h:</span>
+                <span class="stat-value" id="volume-${cryptoId}">$0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Market Cap:</span>
+                <span class="stat-value" id="market-cap-${cryptoId}">$0</span>
+            </div>
+        </div>
+        <div class="chart-tabs">
+            <button class="tab-btn active" data-period="realtime" data-crypto="${cryptoId}">Temps réel</button>
+            <button class="tab-btn" data-period="historical" data-crypto="${cryptoId}">1 Année</button>
         </div>
         <div class="chart-container">
             <canvas id="chart-${cryptoId}"></canvas>
@@ -154,11 +184,28 @@ function createCryptoCard(cryptoId, cryptoInfo) {
     setTimeout(() => {
         const ctx = document.getElementById(`chart-${cryptoId}`);
         if (ctx) {
-            charts[cryptoId] = new Chart(ctx.getContext('2d'), {
-                ...chartConfig,
-                data: JSON.parse(JSON.stringify(chartConfig.data)) // Clone profond
-            });
+            charts[cryptoId] = {
+                chart: new Chart(ctx.getContext('2d'), {
+                    ...chartConfig,
+                    data: JSON.parse(JSON.stringify(chartConfig.data)) // Clone profond
+                }),
+                currentPeriod: 'realtime'
+            };
         }
+        
+        // Ajouter les gestionnaires d'événements pour les onglets
+        const tabBtns = card.querySelectorAll('.tab-btn');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const period = btn.dataset.period;
+                const crypto = btn.dataset.crypto;
+                switchChartPeriod(crypto, period);
+                
+                // Mettre à jour l'apparence des onglets
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+        });
     }, 100);
     
     return card;
@@ -181,6 +228,7 @@ function formatCryptoName(cryptoId) {
 // Mettre à jour une carte crypto
 function updateCryptoCard(cryptoId, cryptoInfo) {
     const current = cryptoInfo.current;
+    const stats = cryptoInfo.stats || {};
     if (!current) return;
     
     // Mettre à jour le prix
@@ -189,7 +237,7 @@ function updateCryptoCard(cryptoId, cryptoInfo) {
         priceElement.textContent = `$${formatPrice(current.usd)}`;
     }
     
-    // Mettre à jour le changement 24h
+    // Mettre à jour le changement 24h dans l'en-tête
     const change24h = current.usd_24h_change || 0;
     const changeElement = document.getElementById(`change-${cryptoId}`);
     if (changeElement) {
@@ -197,14 +245,31 @@ function updateCryptoCard(cryptoId, cryptoInfo) {
         changeElement.className = `change ${change24h >= 0 ? 'positive' : 'negative'}`;
     }
     
-    // Mettre à jour le volume (si l'élément existe)
-    const volumeElement = document.getElementById(`volume-${cryptoId}`);
-    if (volumeElement && current.usd_24h_vol) {
-        volumeElement.textContent = `Volume 24h: $${formatPrice(current.usd_24h_vol)}`;
-    }
+    // Mettre à jour les statistiques détaillées
+    updateStatElement(`change-24h-${cryptoId}`, change24h, true);
+    updateStatElement(`change-year-${cryptoId}`, stats.year_change, true);
+    updateStatElement(`year-high-${cryptoId}`, stats.year_high, false, true);
+    updateStatElement(`year-low-${cryptoId}`, stats.year_low, false, true);
+    updateStatElement(`volume-${cryptoId}`, current.usd_24h_vol, false, true);
+    updateStatElement(`market-cap-${cryptoId}`, stats.market_cap, false, true);
     
     // Mettre à jour le graphique
     updateChart(cryptoId, cryptoInfo);
+}
+
+// Fonction helper pour mettre à jour un élément de statistique
+function updateStatElement(elementId, value, isPercentage = false, isPrice = false) {
+    const element = document.getElementById(elementId);
+    if (!element || value === undefined || value === null) return;
+    
+    if (isPercentage) {
+        element.textContent = `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+        element.className = `stat-value ${value >= 0 ? 'positive' : 'negative'}`;
+    } else if (isPrice) {
+        element.textContent = `$${formatPrice(value)}`;
+    } else {
+        element.textContent = value.toString();
+    }
 }
 
 // Formater le prix
@@ -220,27 +285,58 @@ function formatPrice(price) {
     }
 }
 
+// Changer la période du graphique
+function switchChartPeriod(cryptoId, period) {
+    const chartObj = charts[cryptoId];
+    if (!chartObj) return;
+    
+    chartObj.currentPeriod = period;
+    updateChart(cryptoId, crypto_data[cryptoId] || {});
+}
+
 // Mettre à jour le graphique
 function updateChart(cryptoId, cryptoInfo) {
-    const chart = charts[cryptoId];
-    if (!chart) return;
+    const chartObj = charts[cryptoId];
+    if (!chartObj) return;
     
-    const prices = cryptoInfo.prices || [];
-    const timestamps = cryptoInfo.timestamps || [];
+    const chart = chartObj.chart;
+    const period = chartObj.currentPeriod || 'realtime';
+    
+    let prices, timestamps;
+    
+    if (period === 'historical') {
+        prices = cryptoInfo.historical_prices || [];
+        timestamps = cryptoInfo.historical_timestamps || [];
+    } else {
+        prices = cryptoInfo.prices || [];
+        timestamps = cryptoInfo.timestamps || [];
+    }
     
     if (prices.length === 0) return;
     
-    // Limiter le nombre de points affichés pour des performances optimales
-    const maxPoints = 50;
+    // Limiter le nombre de points affichés selon la période
+    const maxPoints = period === 'historical' ? 100 : 50;
     const step = Math.max(1, Math.floor(prices.length / maxPoints));
     
     const filteredPrices = prices.filter((_, index) => index % step === 0);
     const filteredTimestamps = timestamps.filter((_, index) => index % step === 0);
     
-    chart.data.labels = filteredTimestamps.map(ts => new Date(ts).toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit'
-    }));
+    // Formater les labels selon la période
+    chart.data.labels = filteredTimestamps.map(ts => {
+        const date = new Date(ts);
+        if (period === 'historical') {
+            return date.toLocaleDateString('fr-FR', {
+                month: 'short',
+                day: 'numeric'
+            });
+        } else {
+            return date.toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    });
+    
     chart.data.datasets[0].data = filteredPrices;
     
     // Mettre à jour la couleur en fonction de la tendance
@@ -253,6 +349,9 @@ function updateChart(cryptoId, cryptoInfo) {
     
     chart.update('none');
 }
+
+// Variable globale pour stocker les données
+let crypto_data = {};
 
 // Gestion des erreurs globales
 window.addEventListener('error', function(event) {
