@@ -26,7 +26,7 @@ let crypto_data = {};
 let newsData = [];
 let marketStats = {};
 
-// Configuration des graphiques
+// Configuration des graphiques améliorée
 const chartConfig = {
     type: 'line',
     data: {
@@ -35,12 +35,20 @@ const chartConfig = {
             label: 'Prix USD',
             data: [],
             borderColor: '#4CAF50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+            backgroundColor: createGradient,
             tension: 0.4,
             fill: true,
             pointRadius: 0,
-            pointHoverRadius: 5,
-            borderWidth: 2
+            pointHoverRadius: 8,
+            pointBackgroundColor: '#4CAF50',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointHoverBorderWidth: 3,
+            borderWidth: 3,
+            shadowOffsetX: 0,
+            shadowOffsetY: 2,
+            shadowBlur: 10,
+            shadowColor: 'rgba(76, 175, 80, 0.3)'
         }]
     },
     options: {
@@ -50,49 +58,159 @@ const chartConfig = {
             intersect: false,
             mode: 'index'
         },
+        elements: {
+            point: {
+                hoverRadius: 8,
+                hoverBorderWidth: 3
+            },
+            line: {
+                borderJoinStyle: 'round',
+                borderCapStyle: 'round'
+            }
+        },
         plugins: {
             legend: {
                 display: false
             },
             tooltip: {
-                backgroundColor: 'rgba(45, 45, 45, 0.9)',
-                titleColor: '#fff',
-                bodyColor: '#fff',
+                enabled: true,
+                backgroundColor: 'rgba(22, 27, 34, 0.95)',
+                titleColor: '#f0f6ff',
+                bodyColor: '#e8eaed',
                 borderColor: '#4CAF50',
-                borderWidth: 1,
-                cornerRadius: 8,
-                displayColors: false
-            }
-        },
-        scales: {
-            x: {
-                display: false,
-                grid: {
-                    display: false
-                }
-            },
-            y: {
-                grid: {
-                    color: 'rgba(255, 255, 255, 0.1)',
-                    lineWidth: 1
+                borderWidth: 2,
+                cornerRadius: 12,
+                displayColors: false,
+                titleFont: {
+                    size: 14,
+                    weight: 'bold'
                 },
-                ticks: {
-                    color: '#fff',
-                    font: {
-                        size: 12
+                bodyFont: {
+                    size: 13,
+                    weight: '500'
+                },
+                padding: 12,
+                titleSpacing: 8,
+                bodySpacing: 6,
+                caretSize: 8,
+                caretPadding: 10,
+                usePointStyle: true,
+                callbacks: {
+                    title: function(tooltipItems) {
+                        return 'Prix: ' + tooltipItems[0].label;
                     },
-                    callback: function(value) {
-                        return '$' + value.toLocaleString();
+                    label: function(context) {
+                        return '$' + parseFloat(context.parsed.y).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 6
+                        });
+                    },
+                    afterLabel: function(context) {
+                        const data = context.dataset.data;
+                        const currentIndex = context.dataIndex;
+                        if (currentIndex > 0) {
+                            const prevValue = data[currentIndex - 1];
+                            const currentValue = data[currentIndex];
+                            const change = ((currentValue - prevValue) / prevValue * 100);
+                            return change >= 0 ? 
+                                `📈 +${change.toFixed(2)}%` : 
+                                `📉 ${change.toFixed(2)}%`;
+                        }
+                        return '';
                     }
                 }
             }
         },
+        scales: {
+            x: {
+                display: true,
+                grid: {
+                    display: true,
+                    color: 'rgba(255, 255, 255, 0.05)',
+                    lineWidth: 1,
+                    drawBorder: false
+                },
+                ticks: {
+                    display: false
+                },
+                border: {
+                    display: false
+                }
+            },
+            y: {
+                display: true,
+                position: 'right',
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.08)',
+                    lineWidth: 1,
+                    drawBorder: false
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    font: {
+                        size: 11,
+                        weight: '500'
+                    },
+                    padding: 10,
+                    maxTicksLimit: 6,
+                    callback: function(value) {
+                        if (value >= 1000000) {
+                            return '$' + (value / 1000000).toFixed(1) + 'M';
+                        } else if (value >= 1000) {
+                            return '$' + (value / 1000).toFixed(1) + 'K';
+                        } else if (value >= 1) {
+                            return '$' + value.toFixed(0);
+                        } else {
+                            return '$' + value.toFixed(4);
+                        }
+                    }
+                },
+                border: {
+                    display: false
+                }
+            }
+        },
         animation: {
-            duration: userSettings.animationsEnabled ? 750 : 0,
-            easing: 'easeInOutQuart'
+            duration: userSettings.animationsEnabled ? 1200 : 0,
+            easing: 'easeInOutCubic',
+            delay: (context) => {
+                let delay = 0;
+                if (context.type === 'data' && context.mode === 'default') {
+                    delay = context.dataIndex * 30;
+                }
+                return delay;
+            }
+        },
+        transitions: {
+            active: {
+                animation: {
+                    duration: 400
+                }
+            }
         }
     }
 };
+
+// Fonction pour créer des dégradés dynamiques
+function createGradient(ctx, chartArea, isUpTrend = true) {
+    if (!chartArea) {
+        return null;
+    }
+    
+    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+    
+    if (isUpTrend) {
+        gradient.addColorStop(0, 'rgba(76, 175, 80, 0.05)');
+        gradient.addColorStop(0.5, 'rgba(76, 175, 80, 0.15)');
+        gradient.addColorStop(1, 'rgba(76, 175, 80, 0.3)');
+    } else {
+        gradient.addColorStop(0, 'rgba(244, 67, 54, 0.05)');
+        gradient.addColorStop(0.5, 'rgba(244, 67, 54, 0.15)');
+        gradient.addColorStop(1, 'rgba(244, 67, 54, 0.3)');
+    }
+    
+    return gradient;
+}
 
 // ===== GESTION DES WEBSOCKETS =====
 function connectWebSocket() {
@@ -1191,31 +1309,119 @@ function updateChart(cryptoId, cryptoInfo) {
     const filteredPrices = prices.filter((_, index) => index % step === 0);
     const filteredTimestamps = timestamps.filter((_, index) => index % step === 0);
     
-    chart.data.labels = filteredTimestamps.map(ts => {
+    // Formatage des labels avec plus de détails
+    chart.data.labels = filteredTimestamps.map((ts, index) => {
         const date = new Date(ts);
         if (period === 'historical') {
-            return date.toLocaleDateString('fr-FR', {
-                month: 'short',
-                day: 'numeric'
-            });
+            // Afficher seulement quelques labels pour éviter l'encombrement
+            if (index % Math.ceil(filteredTimestamps.length / 6) === 0) {
+                return date.toLocaleDateString('fr-FR', {
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+            return '';
         } else {
-            return date.toLocaleTimeString('fr-FR', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            if (index % Math.ceil(filteredTimestamps.length / 8) === 0) {
+                return date.toLocaleTimeString('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+            return '';
         }
     });
     
     chart.data.datasets[0].data = filteredPrices;
     
+    // Déterminer la tendance globale
     const isUpTrend = filteredPrices.length > 1 && 
                       filteredPrices[filteredPrices.length - 1] > filteredPrices[0];
     
-    chart.data.datasets[0].borderColor = isUpTrend ? '#4CAF50' : '#f44336';
-    chart.data.datasets[0].backgroundColor = isUpTrend ? 
-        'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)';
+    // Calculer la volatilité pour ajuster l'épaisseur de ligne
+    const volatility = calculateVolatility(filteredPrices);
+    const baseWidth = 3;
+    const dynamicWidth = Math.min(baseWidth + volatility * 2, 6);
     
-    chart.update('none');
+    // Couleurs et effets dynamiques basés sur la tendance
+    if (isUpTrend) {
+        chart.data.datasets[0].borderColor = createGradientBorder(chart.ctx, chart.chartArea, '#00C853', '#4CAF50');
+        chart.data.datasets[0].backgroundColor = createGradient(chart.ctx, chart.chartArea, true);
+        chart.data.datasets[0].pointBorderColor = '#00C853';
+        chart.data.datasets[0].pointBackgroundColor = '#ffffff';
+    } else {
+        chart.data.datasets[0].borderColor = createGradientBorder(chart.ctx, chart.chartArea, '#FF1744', '#f44336');
+        chart.data.datasets[0].backgroundColor = createGradient(chart.ctx, chart.chartArea, false);
+        chart.data.datasets[0].pointBorderColor = '#FF1744';
+        chart.data.datasets[0].pointBackgroundColor = '#ffffff';
+    }
+    
+    chart.data.datasets[0].borderWidth = dynamicWidth;
+    
+    // Mise à jour avec animation fluide
+    chart.update('active');
+    
+    // Ajouter des effets de pulsation pour les points importants
+    addPulseEffect(chart, filteredPrices);
+}
+
+// Fonction pour calculer la volatilité
+function calculateVolatility(prices) {
+    if (prices.length < 2) return 0;
+    
+    const changes = [];
+    for (let i = 1; i < prices.length; i++) {
+        const change = Math.abs((prices[i] - prices[i-1]) / prices[i-1]);
+        changes.push(change);
+    }
+    
+    const avgChange = changes.reduce((sum, change) => sum + change, 0) / changes.length;
+    return Math.min(avgChange * 100, 1); // Normaliser entre 0 et 1
+}
+
+// Fonction pour créer des bordures dégradées
+function createGradientBorder(ctx, chartArea, startColor, endColor) {
+    if (!chartArea) return startColor;
+    
+    const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+    gradient.addColorStop(0, startColor);
+    gradient.addColorStop(0.5, endColor);
+    gradient.addColorStop(1, startColor);
+    
+    return gradient;
+}
+
+// Fonction pour ajouter des effets de pulsation
+function addPulseEffect(chart, prices) {
+    if (!prices || prices.length < 2) return;
+    
+    // Identifier les points hauts et bas significatifs
+    const threshold = 0.05; // 5% de changement
+    const significantPoints = [];
+    
+    for (let i = 1; i < prices.length - 1; i++) {
+        const prevChange = (prices[i] - prices[i-1]) / prices[i-1];
+        const nextChange = (prices[i+1] - prices[i]) / prices[i];
+        
+        if (Math.abs(prevChange) > threshold || Math.abs(nextChange) > threshold) {
+            significantPoints.push(i);
+        }
+    }
+    
+    // Animation de pulsation pour les points significatifs
+    if (userSettings.animationsEnabled && significantPoints.length > 0) {
+        setTimeout(() => {
+            chart.data.datasets[0].pointRadius = prices.map((_, index) => 
+                significantPoints.includes(index) ? 4 : 0
+            );
+            chart.update('none');
+            
+            setTimeout(() => {
+                chart.data.datasets[0].pointRadius = prices.map(() => 0);
+                chart.update('none');
+            }, 1000);
+        }, 500);
+    }
 }
 
 // ===== INITIALISATION =====
