@@ -130,6 +130,37 @@ function connectWebSocket() {
     };
 }
 
+// ===== RAFRAÎCHISSEMENT MANUEL =====
+async function refreshPrices() {
+    const refreshBtn = document.getElementById('refresh-prices-btn');
+    if (!refreshBtn) return;
+    
+    // Animation du bouton
+    refreshBtn.disabled = true;
+    refreshBtn.style.transform = 'rotate(360deg)';
+    refreshBtn.style.transition = 'transform 0.5s ease';
+    
+    try {
+        // Demander les données actualisées au serveur
+        const response = await fetch('/api/refresh');
+        if (response.ok) {
+            showNotification('Prix actualisés avec succès!', 'success');
+            updateStatus('🟢 Connecté - Données actualisées', 'connected');
+        } else {
+            showNotification('Erreur lors de l\'actualisation', 'error');
+        }
+    } catch (error) {
+        console.error('Erreur lors du rafraîchissement:', error);
+        showNotification('Erreur de connexion lors de l\'actualisation', 'error');
+    } finally {
+        // Remettre le bouton à l'état normal
+        setTimeout(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.style.transform = 'rotate(0deg)';
+        }, 500);
+    }
+}
+
 // ===== GESTION DES DONNÉES CRYPTO =====
 function updateCryptoData(data) {
     crypto_data = data;
@@ -970,6 +1001,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('view-mode').addEventListener('change', (e) => {
         switchView(e.target.value);
     });
+    
+    // Bouton de rafraîchissement manuel
+    document.getElementById('refresh-prices-btn').addEventListener('click', refreshPrices);
     
     // Onglets des paramètres
     document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => {

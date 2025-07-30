@@ -235,6 +235,20 @@ body::before {
     border-color: #4CAF50;
 }
 
+.tool-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+#refresh-prices-btn {
+    transition: transform 0.3s ease;
+}
+
+#refresh-prices-btn:hover:not(:disabled) {
+    transform: rotate(45deg);
+}
+
 /* Market Overview */
 .market-overview {
     display: grid;

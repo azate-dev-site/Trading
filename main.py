@@ -183,5 +183,16 @@ async def get_crypto_data(crypto_id: str):
         return crypto_data[crypto_id]
     return {"error": "Crypto not found"}
 
+@app.get("/api/refresh")
+async def refresh_prices():
+    """API pour forcer un rafraîchissement des prix"""
+    try:
+        # Forcer une mise à jour immédiate
+        await fetch_crypto_data()
+        await broadcast_data()
+        return {"status": "success", "message": "Prix actualisés", "timestamp": datetime.now().isoformat()}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
