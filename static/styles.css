@@ -213,9 +213,105 @@ body::before {
 
 .toolbar-actions {
     display: flex;
-    gap: 10px;
+    gap: 16px;
     align-items: center;
     flex-wrap: wrap;
+}
+
+/* Menu hamburger */
+.menu-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.menu-toggle {
+    background: rgba(45, 45, 45, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    width: 44px;
+    height: 44px;
+}
+
+.menu-toggle:hover {
+    background: rgba(76, 175, 80, 0.2);
+    border-color: #4CAF50;
+    transform: translateY(-1px);
+}
+
+.menu-bar {
+    width: 20px;
+    height: 2px;
+    background: #e8eaed;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.menu-toggle.active .menu-bar:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+.menu-toggle.active .menu-bar:nth-child(2) {
+    opacity: 0;
+}
+
+.menu-toggle.active .menu-bar:nth-child(3) {
+    transform: rotate(-45deg) translate(7px, -6px);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    background: rgba(22, 27, 34, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(48, 54, 61, 0.5);
+    border-radius: 12px;
+    padding: 8px;
+    min-width: 200px;
+    box-shadow: 
+        0 12px 32px rgba(0, 0, 0, 0.3),
+        0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px) scale(0.95);
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.dropdown-menu.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.875rem;
+}
+
+.dropdown-item:last-child {
+    margin-bottom: 0;
+}
+
+.dropdown-item:hover {
+    background: rgba(76, 175, 80, 0.15);
+    transform: translateX(4px);
 }
 
 .tool-btn, .view-selector {
@@ -1326,7 +1422,13 @@ body::before {
     }
     
     .toolbar-actions {
-        justify-content: center;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .dropdown-menu {
+        right: -8px;
+        min-width: 180px;
     }
     
     .market-overview {
