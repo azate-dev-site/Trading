@@ -482,36 +482,6 @@ function updateFavoriteButtons() {
     });
 }
 
-// ===== MENU HAMBURGER =====
-function setupHamburgerMenu() {
-    const menuToggle = document.getElementById('menu-toggle');
-    const dropdownMenu = document.getElementById('dropdown-menu');
-    
-    menuToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        menuToggle.classList.toggle('active');
-        dropdownMenu.classList.toggle('active');
-    });
-    
-    // Fermer le menu en cliquant ailleurs
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.menu-container')) {
-            menuToggle.classList.remove('active');
-            dropdownMenu.classList.remove('active');
-        }
-    });
-    
-    // Fermer le menu après clic sur un élément
-    dropdownMenu.addEventListener('click', (e) => {
-        if (e.target.classList.contains('dropdown-item') && !e.target.matches('select')) {
-            setTimeout(() => {
-                menuToggle.classList.remove('active');
-                dropdownMenu.classList.remove('active');
-            }, 150);
-        }
-    });
-}
-
 // ===== RECHERCHE =====
 function setupSearch() {
     const searchInput = document.getElementById('crypto-search');
@@ -1034,9 +1004,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Bouton de rafraîchissement manuel
     document.getElementById('refresh-prices-btn').addEventListener('click', refreshPrices);
-    
-    // Menu hamburger
-    setupHamburgerMenu();
     
     // Onglets des paramètres
     document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => {
