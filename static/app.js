@@ -2,6 +2,29 @@
 // Variables globales
 let ws;
 let charts = {};
+let portfolio = [];
+let transactions = [];
+let alerts = [];
+let favorites = JSON.parse(localStorage.getItem('crypto-favorites')) || [];
+let userSettings = JSON.parse(localStorage.getItem('user-settings')) || {
+    theme: 'dark',
+    currency: 'usd',
+    autoRefresh: true,
+    refreshInterval: 5,
+    priceAlerts: true,
+    marketAlerts: true,
+    newsNotifications: true,
+    emailNotifications: false,
+    animationsEnabled: true,
+    saveLocally: true,
+    defaultExchange: 'binance'
+};
+
+// État utilisateur
+let currentUser = JSON.parse(localStorage.getItem('current-user')) || null;
+let crypto_data = {};
+let newsData = [];
+let marketStats = {};
 
 // Configuration des graphiques
 const chartConfig = {
@@ -65,13 +88,13 @@ const chartConfig = {
             }
         },
         animation: {
-            duration: 750,
+            duration: userSettings.animationsEnabled ? 750 : 0,
             easing: 'easeInOutQuart'
         }
     }
 };
 
-// Fonction de connexion WebSocket
+// ===== GESTION DES WEBSOCKETS =====
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
@@ -97,6 +120,9 @@ function connectWebSocket() {
             const message = JSON.parse(event.data);
             if (message.type === 'crypto_update') {
                 updateCryptoData(message.data);
+                updateMarketStats();
+                checkPriceAlerts();
+                updatePortfolioValue();
             }
         } catch (error) {
             console.error('Erreur parsing message:', error);
@@ -104,22 +130,24 @@ function connectWebSocket() {
     };
 }
 
-// Mettre à jour le statut de connexion
-function updateStatus(text, className) {
-    const statusElement = document.getElementById('status');
-    if (statusElement) {
-        statusElement.textContent = text;
-        statusElement.className = `status ${className}`;
+// ===== GESTION DES DONNÉES CRYPTO =====
+function updateCryptoData(data) {
+    crypto_data = data;
+    
+    const viewMode = document.getElementById('view-mode').value;
+    
+    if (viewMode === 'grid') {
+        updateCryptoGrid(data);
+    } else if (viewMode === 'table') {
+        updateCryptoTable(data);
     }
+    
+    updateSearchResults();
 }
 
-// Mettre à jour les données crypto
-function updateCryptoData(data) {
+function updateCryptoGrid(data) {
     const grid = document.getElementById('crypto-grid');
     if (!grid) return;
-    
-    // Mettre à jour les données globales
-    crypto_data = data;
     
     for (const [cryptoId, cryptoInfo] of Object.entries(data)) {
         let card = document.getElementById(`card-${cryptoId}`);
@@ -133,16 +161,577 @@ function updateCryptoData(data) {
     }
 }
 
-// Créer une carte crypto
+function updateCryptoTable(data) {
+    const tableBody = document.getElementById('crypto-table-body');
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = '';
+    
+    Object.entries(data).forEach(([cryptoId, cryptoInfo]) => {
+        const row = createTableRow(cryptoId, cryptoInfo);
+        tableBody.appendChild(row);
+    });
+}
+
+function createTableRow(cryptoId, cryptoInfo) {
+    const row = document.createElement('tr');
+    const current = cryptoInfo.current || {};
+    const isFavorite = favorites.includes(cryptoId);
+    
+    row.innerHTML = `
+        <td>
+            <button class="favorite-btn ${isFavorite ? 'active' : ''}" data-crypto="${cryptoId}">
+                ${isFavorite ? '⭐' : '☆'}
+            </button>
+        </td>
+        <td class="crypto-name-cell">
+            <strong>${formatCryptoName(cryptoId)}</strong>
+        </td>
+        <td class="price-cell">$${formatPrice(current.usd || 0)}</td>
+        <td class="change-cell ${(current.usd_24h_change || 0) >= 0 ? 'positive' : 'negative'}">
+            ${(current.usd_24h_change || 0).toFixed(2)}%
+        </td>
+        <td class="change-cell">0.00%</td>
+        <td>$${formatPrice(current.usd_24h_vol || 0)}</td>
+        <td>$${formatPrice((cryptoInfo.stats || {}).market_cap || 0)}</td>
+        <td>
+            <button class="action-btn" onclick="addToPortfolio('${cryptoId}')">➕</button>
+            <button class="action-btn" onclick="createAlert('${cryptoId}')">🔔</button>
+        </td>
+    `;
+    
+    return row;
+}
+
+// ===== PORTFOLIO =====
+function updatePortfolioValue() {
+    if (!portfolio.length) return;
+    
+    let totalValue = 0;
+    let totalChange24h = 0;
+    let totalPaid = 0;
+    
+    portfolio.forEach(holding => {
+        const cryptoData = crypto_data[holding.cryptoId];
+        if (cryptoData && cryptoData.current) {
+            const currentPrice = cryptoData.current.usd || 0;
+            const holdingValue = holding.quantity * currentPrice;
+            const paidValue = holding.quantity * holding.avgPrice;
+            
+            totalValue += holdingValue;
+            totalPaid += paidValue;
+            
+            const change24h = (cryptoData.current.usd_24h_change || 0) / 100;
+            totalChange24h += holdingValue * change24h;
+        }
+    });
+    
+    const totalChange = totalValue - totalPaid;
+    const totalChangePercent = totalPaid > 0 ? (totalChange / totalPaid) * 100 : 0;
+    
+    updateElement('total-portfolio-value', `$${formatPrice(totalValue)}`);
+    updateElement('portfolio-24h-change', `$${formatPrice(totalChange24h)} (${(totalChange24h/totalValue*100).toFixed(2)}%)`);
+    updateElement('portfolio-total-change', `$${formatPrice(totalChange)} (${totalChangePercent.toFixed(2)}%)`);
+    updateElement('profile-portfolio-value', `$${formatPrice(totalValue)}`);
+}
+
+function addTransaction(transaction) {
+    transactions.push({
+        ...transaction,
+        id: Date.now(),
+        timestamp: new Date().toISOString()
+    });
+    
+    updatePortfolioFromTransactions();
+    saveToLocalStorage('transactions', transactions);
+    updateTransactionCount();
+    showNotification('Transaction ajoutée avec succès!', 'success');
+}
+
+function updatePortfolioFromTransactions() {
+    const holdings = {};
+    
+    transactions.forEach(tx => {
+        if (!holdings[tx.crypto]) {
+            holdings[tx.crypto] = {
+                cryptoId: tx.crypto,
+                quantity: 0,
+                totalPaid: 0,
+                avgPrice: 0
+            };
+        }
+        
+        if (tx.type === 'buy') {
+            holdings[tx.crypto].quantity += tx.quantity;
+            holdings[tx.crypto].totalPaid += tx.quantity * tx.price + tx.fees;
+        } else if (tx.type === 'sell') {
+            holdings[tx.crypto].quantity -= tx.quantity;
+            holdings[tx.crypto].totalPaid -= tx.quantity * holdings[tx.crypto].avgPrice;
+        }
+        
+        if (holdings[tx.crypto].quantity > 0) {
+            holdings[tx.crypto].avgPrice = holdings[tx.crypto].totalPaid / holdings[tx.crypto].quantity;
+        }
+    });
+    
+    portfolio = Object.values(holdings).filter(h => h.quantity > 0);
+    saveToLocalStorage('portfolio', portfolio);
+}
+
+// ===== ALERTES =====
+function createAlert(cryptoId, targetPrice, condition = 'above') {
+    const alert = {
+        id: Date.now(),
+        cryptoId,
+        targetPrice,
+        condition,
+        active: true,
+        createdAt: new Date().toISOString()
+    };
+    
+    alerts.push(alert);
+    saveToLocalStorage('alerts', alerts);
+    showNotification('Alerte créée avec succès!', 'success');
+    updateAlertsDisplay();
+}
+
+function checkPriceAlerts() {
+    alerts.filter(alert => alert.active).forEach(alert => {
+        const cryptoData = crypto_data[alert.cryptoId];
+        if (!cryptoData || !cryptoData.current) return;
+        
+        const currentPrice = cryptoData.current.usd;
+        let triggered = false;
+        
+        if (alert.condition === 'above' && currentPrice >= alert.targetPrice) {
+            triggered = true;
+        } else if (alert.condition === 'below' && currentPrice <= alert.targetPrice) {
+            triggered = true;
+        }
+        
+        if (triggered) {
+            showNotification(
+                `🔔 Alerte: ${formatCryptoName(alert.cryptoId)} a ${alert.condition === 'above' ? 'dépassé' : 'chuté sous'} $${alert.targetPrice}!`,
+                'warning'
+            );
+            alert.active = false;
+            saveToLocalStorage('alerts', alerts);
+        }
+    });
+}
+
+// ===== ACTUALITÉS =====
+async function fetchNews() {
+    try {
+        // Simulation d'actualités crypto
+        const sampleNews = [
+            {
+                title: "Bitcoin atteint un nouveau sommet historique",
+                description: "Le Bitcoin franchit la barre des $100,000 pour la première fois...",
+                url: "#",
+                publishedAt: new Date().toISOString(),
+                source: "CryptoCoin"
+            },
+            {
+                title: "Ethereum 2.0: Les mises à jour arrivent",
+                description: "Les développeurs d'Ethereum annoncent de nouvelles améliorations...",
+                url: "#",
+                publishedAt: new Date(Date.now() - 3600000).toISOString(),
+                source: "ETH News"
+            },
+            {
+                title: "Régulation crypto: Nouvelles règles en Europe",
+                description: "L'Union Européenne vote de nouvelles règles pour les cryptomonnaies...",
+                url: "#",
+                publishedAt: new Date(Date.now() - 7200000).toISOString(),
+                source: "Regulatory Watch"
+            }
+        ];
+        
+        newsData = sampleNews;
+        updateNewsDisplay();
+    } catch (error) {
+        console.error('Erreur lors de la récupération des actualités:', error);
+    }
+}
+
+function updateNewsDisplay() {
+    const newsList = document.getElementById('news-list');
+    if (!newsList) return;
+    
+    newsList.innerHTML = newsData.map(article => `
+        <div class="news-item">
+            <div class="news-header">
+                <h4>${article.title}</h4>
+                <span class="news-time">${formatTimeAgo(article.publishedAt)}</span>
+            </div>
+            <p>${article.description}</p>
+            <div class="news-footer">
+                <span class="news-source">${article.source}</span>
+                <a href="${article.url}" target="_blank" class="news-link">Lire plus →</a>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ===== OUTILS DE CALCUL =====
+function calculatePnL() {
+    const buyPrice = parseFloat(document.getElementById('buy-price').value);
+    const sellPrice = parseFloat(document.getElementById('sell-price').value);
+    const quantity = parseFloat(document.getElementById('quantity').value);
+    
+    if (!buyPrice || !sellPrice || !quantity) {
+        document.getElementById('pnl-result').innerHTML = 'Veuillez remplir tous les champs';
+        return;
+    }
+    
+    const buyValue = buyPrice * quantity;
+    const sellValue = sellPrice * quantity;
+    const pnl = sellValue - buyValue;
+    const pnlPercent = (pnl / buyValue) * 100;
+    
+    const resultClass = pnl >= 0 ? 'positive' : 'negative';
+    document.getElementById('pnl-result').innerHTML = `
+        <div class="pnl-breakdown">
+            <div>Valeur d'achat: $${buyValue.toFixed(2)}</div>
+            <div>Valeur de vente: $${sellValue.toFixed(2)}</div>
+            <div class="${resultClass}">
+                P&L: $${pnl.toFixed(2)} (${pnlPercent.toFixed(2)}%)
+            </div>
+        </div>
+    `;
+}
+
+function convertCurrency() {
+    const amount = parseFloat(document.getElementById('convert-amount').value);
+    const from = document.getElementById('convert-from').value;
+    const to = document.getElementById('convert-to').value;
+    
+    if (!amount || !from || !to) return;
+    
+    // Simulation de conversion (normalement via API)
+    const rates = {
+        'btc': crypto_data.bitcoin?.current?.usd || 50000,
+        'eth': crypto_data.ethereum?.current?.usd || 3000,
+        'usd': 1,
+        'eur': 0.85
+    };
+    
+    const fromRate = rates[from] || 1;
+    const toRate = rates[to] || 1;
+    const result = (amount * fromRate) / toRate;
+    
+    document.getElementById('conversion-result').textContent = 
+        `${result.toFixed(8)} ${to.toUpperCase()}`;
+}
+
+// ===== GESTION DES FAVORIS =====
+function toggleFavorite(cryptoId) {
+    const index = favorites.indexOf(cryptoId);
+    if (index > -1) {
+        favorites.splice(index, 1);
+    } else {
+        favorites.push(cryptoId);
+    }
+    
+    saveToLocalStorage('crypto-favorites', favorites);
+    updateFavoriteButtons();
+    showNotification(
+        index > -1 ? 'Retiré des favoris' : 'Ajouté aux favoris',
+        'info'
+    );
+}
+
+function updateFavoriteButtons() {
+    document.querySelectorAll('.favorite-btn').forEach(btn => {
+        const cryptoId = btn.dataset.crypto;
+        const isFavorite = favorites.includes(cryptoId);
+        btn.textContent = isFavorite ? '⭐' : '☆';
+        btn.classList.toggle('active', isFavorite);
+    });
+}
+
+// ===== RECHERCHE =====
+function setupSearch() {
+    const searchInput = document.getElementById('crypto-search');
+    const searchResults = document.getElementById('search-results');
+    
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        
+        if (query.length < 2) {
+            searchResults.style.display = 'none';
+            return;
+        }
+        
+        const matches = Object.keys(crypto_data).filter(cryptoId => 
+            formatCryptoName(cryptoId).toLowerCase().includes(query) ||
+            cryptoId.toLowerCase().includes(query)
+        ).slice(0, 5);
+        
+        if (matches.length > 0) {
+            searchResults.innerHTML = matches.map(cryptoId => `
+                <div class="search-result-item" data-crypto="${cryptoId}">
+                    ${formatCryptoName(cryptoId)}
+                </div>
+            `).join('');
+            searchResults.style.display = 'block';
+        } else {
+            searchResults.style.display = 'none';
+        }
+    });
+    
+    searchResults.addEventListener('click', (e) => {
+        if (e.target.classList.contains('search-result-item')) {
+            const cryptoId = e.target.dataset.crypto;
+            const card = document.getElementById(`card-${cryptoId}`);
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth' });
+                card.classList.add('highlight');
+                setTimeout(() => card.classList.remove('highlight'), 2000);
+            }
+            searchResults.style.display = 'none';
+            searchInput.value = '';
+        }
+    });
+}
+
+// ===== STATISTIQUES DU MARCHÉ =====
+function updateMarketStats() {
+    // Calcul des statistiques globales
+    let totalMarketCap = 0;
+    let totalVolume = 0;
+    let btcDominance = 0;
+    
+    Object.values(crypto_data).forEach(crypto => {
+        if (crypto.stats && crypto.current) {
+            totalMarketCap += crypto.stats.market_cap || 0;
+            totalVolume += crypto.current.usd_24h_vol || 0;
+        }
+    });
+    
+    if (crypto_data.bitcoin && crypto_data.bitcoin.stats) {
+        btcDominance = ((crypto_data.bitcoin.stats.market_cap || 0) / totalMarketCap) * 100;
+    }
+    
+    updateElement('total-market-cap', `$${formatPrice(totalMarketCap)}`);
+    updateElement('total-volume', `$${formatPrice(totalVolume)}`);
+    updateElement('btc-dominance', `${btcDominance.toFixed(1)}%`);
+    
+    // Fear & Greed Index (simulation)
+    const fearGreedValue = Math.floor(Math.random() * 100);
+    updateElement('fear-greed', fearGreedValue);
+    updateFearGreedIndicator(fearGreedValue);
+}
+
+function updateFearGreedIndicator(value) {
+    const indicator = document.getElementById('fear-greed-indicator');
+    if (!indicator) return;
+    
+    let color, text;
+    if (value <= 25) {
+        color = '#f44336';
+        text = 'Peur Extrême';
+    } else if (value <= 45) {
+        color = '#ff9800';
+        text = 'Peur';
+    } else if (value <= 55) {
+        color = '#ffeb3b';
+        text = 'Neutre';
+    } else if (value <= 75) {
+        color = '#8bc34a';
+        text = 'Cupidité';
+    } else {
+        color = '#4caf50';
+        text = 'Cupidité Extrême';
+    }
+    
+    indicator.style.background = color;
+    indicator.textContent = text;
+}
+
+// ===== GESTION DES VUES =====
+function switchView(mode) {
+    const grid = document.getElementById('crypto-grid');
+    const table = document.getElementById('crypto-table');
+    
+    if (mode === 'table') {
+        grid.style.display = 'none';
+        table.style.display = 'block';
+        updateCryptoTable(crypto_data);
+    } else {
+        grid.style.display = 'grid';
+        table.style.display = 'none';
+    }
+}
+
+// ===== GESTION DES PARAMÈTRES =====
+function switchSettingsTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    document.getElementById(`${tabName}-tab`).classList.add('active');
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+}
+
+function saveSettings() {
+    userSettings.theme = document.getElementById('theme-select').value;
+    userSettings.currency = document.getElementById('currency-select').value;
+    userSettings.autoRefresh = document.getElementById('auto-refresh').checked;
+    userSettings.refreshInterval = parseInt(document.getElementById('refresh-interval').value);
+    userSettings.priceAlerts = document.getElementById('price-alerts').checked;
+    userSettings.marketAlerts = document.getElementById('market-alerts').checked;
+    userSettings.newsNotifications = document.getElementById('news-notifications').checked;
+    userSettings.emailNotifications = document.getElementById('email-notifications').checked;
+    userSettings.animationsEnabled = document.getElementById('animations-enabled').checked;
+    userSettings.saveLocally = document.getElementById('save-locally').checked;
+    userSettings.defaultExchange = document.getElementById('default-exchange').value;
+    
+    saveToLocalStorage('user-settings', userSettings);
+    applyTheme(userSettings.theme);
+    
+    closeModal('settings-modal');
+    showNotification('Paramètres sauvegardés !', 'success');
+}
+
+// ===== UTILITAIRES =====
+function formatPrice(price) {
+    if (price >= 1000000) {
+        return (price / 1000000).toFixed(2) + 'M';
+    } else if (price >= 1000) {
+        return (price / 1000).toFixed(2) + 'K';
+    } else if (price >= 1) {
+        return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else {
+        return price.toFixed(6);
+    }
+}
+
+function formatCryptoName(cryptoId) {
+    const names = {
+        'bitcoin': 'Bitcoin (BTC)',
+        'ethereum': 'Ethereum (ETH)',
+        'binancecoin': 'Binance Coin (BNB)',
+        'cardano': 'Cardano (ADA)',
+        'solana': 'Solana (SOL)',
+        'dogecoin': 'Dogecoin (DOGE)',
+        'polygon': 'Polygon (MATIC)',
+        'chainlink': 'Chainlink (LINK)',
+        'litecoin': 'Litecoin (LTC)',
+        'avalanche-2': 'Avalanche (AVAX)',
+        'uniswap': 'Uniswap (UNI)',
+        'polkadot': 'Polkadot (DOT)',
+        'near': 'NEAR Protocol (NEAR)',
+        'cosmos': 'Cosmos (ATOM)',
+        'algorand': 'Algorand (ALGO)',
+        'tron': 'TRON (TRX)',
+        'stellar': 'Stellar (XLM)',
+        'filecoin': 'Filecoin (FIL)',
+        'vechain': 'VeChain (VET)',
+        'hedera-hashgraph': 'Hedera (HBAR)',
+        'internet-computer': 'Internet Computer (ICP)',
+        'the-sandbox': 'The Sandbox (SAND)'
+    };
+    return names[cryptoId] || cryptoId.charAt(0).toUpperCase() + cryptoId.slice(1);
+}
+
+function formatTimeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return 'À l\'instant';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    return `${Math.floor(diffInSeconds / 86400)}j`;
+}
+
+function saveToLocalStorage(key, data) {
+    if (userSettings.saveLocally) {
+        localStorage.setItem(key, JSON.stringify(data));
+    }
+}
+
+function updateElement(id, content) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = content;
+}
+
+function showNotification(message, type = 'info') {
+    const container = document.getElementById('notifications-container');
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+    
+    notification.innerHTML = `
+        <span class="notification-icon">${icons[type] || icons.info}</span>
+        <span class="notification-message">${message}</span>
+        <button class="notification-close">&times;</button>
+    `;
+    
+    container.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+    
+    notification.querySelector('.notification-close').addEventListener('click', () => {
+        notification.remove();
+    });
+}
+
+function openModal(modalId) {
+    document.getElementById(modalId).style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+function applyTheme(theme) {
+    document.body.className = theme === 'light' ? 'light-theme' : 'dark-theme';
+}
+
+function updateStatus(text, className) {
+    const statusElement = document.getElementById('status');
+    if (statusElement) {
+        statusElement.textContent = text;
+        statusElement.className = `status ${className}`;
+    }
+}
+
+function updateTransactionCount() {
+    updateElement('profile-transactions', transactions.length);
+}
+
+// Reprendre les fonctions existantes pour les cartes crypto
 function createCryptoCard(cryptoId, cryptoInfo) {
     const card = document.createElement('div');
     card.className = 'crypto-card';
     card.id = `card-${cryptoId}`;
     
+    const isFavorite = favorites.includes(cryptoId);
+    
     card.innerHTML = `
         <div class="crypto-header">
             <div class="crypto-name" id="name-${cryptoId}">${formatCryptoName(cryptoId)}</div>
-            <div class="change" id="change-${cryptoId}">0.00%</div>
+            <div class="crypto-actions">
+                <button class="favorite-btn ${isFavorite ? 'active' : ''}" data-crypto="${cryptoId}">
+                    ${isFavorite ? '⭐' : '☆'}
+                </button>
+                <div class="change" id="change-${cryptoId}">0.00%</div>
+            </div>
         </div>
         <div class="price" id="price-${cryptoId}">$0.00</div>
         <div class="crypto-stats">
@@ -178,22 +767,26 @@ function createCryptoCard(cryptoId, cryptoInfo) {
         <div class="chart-container">
             <canvas id="chart-${cryptoId}"></canvas>
         </div>
+        <div class="card-actions">
+            <button class="action-btn" onclick="addToPortfolio('${cryptoId}')">➕ Portfolio</button>
+            <button class="action-btn" onclick="openAlertModal('${cryptoId}')">🔔 Alerte</button>
+        </div>
     `;
     
-    // Créer le graphique après un court délai pour s'assurer que l'élément est dans le DOM
+    // Ajouter les événements
     setTimeout(() => {
         const ctx = document.getElementById(`chart-${cryptoId}`);
         if (ctx) {
             charts[cryptoId] = {
                 chart: new Chart(ctx.getContext('2d'), {
                     ...chartConfig,
-                    data: JSON.parse(JSON.stringify(chartConfig.data)) // Clone profond
+                    data: JSON.parse(JSON.stringify(chartConfig.data))
                 }),
                 currentPeriod: 'realtime'
             };
         }
         
-        // Ajouter les gestionnaires d'événements pour les onglets
+        // Gestionnaires d'événements
         const tabBtns = card.querySelectorAll('.tab-btn');
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -201,58 +794,27 @@ function createCryptoCard(cryptoId, cryptoInfo) {
                 const crypto = btn.dataset.crypto;
                 switchChartPeriod(crypto, period);
                 
-                // Mettre à jour l'apparence des onglets
                 tabBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             });
+        });
+        
+        const favoriteBtn = card.querySelector('.favorite-btn');
+        favoriteBtn.addEventListener('click', () => {
+            toggleFavorite(cryptoId);
         });
     }, 100);
     
     return card;
 }
 
-// Formater le nom de la crypto
-function formatCryptoName(cryptoId) {
-    const names = {
-        'bitcoin': 'Bitcoin (BTC)',
-        'ethereum': 'Ethereum (ETH)',
-        'binancecoin': 'Binance Coin (BNB)',
-        'cardano': 'Cardano (ADA)',
-        'solana': 'Solana (SOL)',
-        'dogecoin': 'Dogecoin (DOGE)',
-        'polygon': 'Polygon (MATIC)',
-        'chainlink': 'Chainlink (LINK)',
-        'litecoin': 'Litecoin (LTC)',
-        'avalanche-2': 'Avalanche (AVAX)',
-        'uniswap': 'Uniswap (UNI)',
-        'polkadot': 'Polkadot (DOT)',
-        'near': 'NEAR Protocol (NEAR)',
-        'cosmos': 'Cosmos (ATOM)',
-        'algorand': 'Algorand (ALGO)',
-        'tron': 'TRON (TRX)',
-        'stellar': 'Stellar (XLM)',
-        'filecoin': 'Filecoin (FIL)',
-        'vechain': 'VeChain (VET)',
-        'hedera-hashgraph': 'Hedera (HBAR)',
-        'internet-computer': 'Internet Computer (ICP)',
-        'the-sandbox': 'The Sandbox (SAND)'
-    };
-    return names[cryptoId] || cryptoId.charAt(0).toUpperCase() + cryptoId.slice(1);
-}
-
-// Mettre à jour une carte crypto
 function updateCryptoCard(cryptoId, cryptoInfo) {
     const current = cryptoInfo.current;
     const stats = cryptoInfo.stats || {};
     if (!current) return;
     
-    // Mettre à jour le prix
-    const priceElement = document.getElementById(`price-${cryptoId}`);
-    if (priceElement && current.usd !== undefined) {
-        priceElement.textContent = `$${formatPrice(current.usd)}`;
-    }
+    updateElement(`price-${cryptoId}`, `$${formatPrice(current.usd)}`);
     
-    // Mettre à jour le changement 24h dans l'en-tête
     const change24h = current.usd_24h_change || 0;
     const changeElement = document.getElementById(`change-${cryptoId}`);
     if (changeElement) {
@@ -260,7 +822,6 @@ function updateCryptoCard(cryptoId, cryptoInfo) {
         changeElement.className = `change ${change24h >= 0 ? 'positive' : 'negative'}`;
     }
     
-    // Mettre à jour les statistiques détaillées
     updateStatElement(`change-24h-${cryptoId}`, change24h, true);
     updateStatElement(`change-year-${cryptoId}`, stats.year_change, true);
     updateStatElement(`year-high-${cryptoId}`, stats.year_high, false, true);
@@ -268,11 +829,9 @@ function updateCryptoCard(cryptoId, cryptoInfo) {
     updateStatElement(`volume-${cryptoId}`, current.usd_24h_vol, false, true);
     updateStatElement(`market-cap-${cryptoId}`, stats.market_cap, false, true);
     
-    // Mettre à jour le graphique
     updateChart(cryptoId, cryptoInfo);
 }
 
-// Fonction helper pour mettre à jour un élément de statistique
 function updateStatElement(elementId, value, isPercentage = false, isPrice = false) {
     const element = document.getElementById(elementId);
     if (!element || value === undefined || value === null) return;
@@ -287,20 +846,6 @@ function updateStatElement(elementId, value, isPercentage = false, isPrice = fal
     }
 }
 
-// Formater le prix
-function formatPrice(price) {
-    if (price >= 1000000) {
-        return (price / 1000000).toFixed(2) + 'M';
-    } else if (price >= 1000) {
-        return (price / 1000).toFixed(2) + 'K';
-    } else if (price >= 1) {
-        return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } else {
-        return price.toFixed(6);
-    }
-}
-
-// Changer la période du graphique
 function switchChartPeriod(cryptoId, period) {
     const chartObj = charts[cryptoId];
     if (!chartObj) return;
@@ -309,7 +854,6 @@ function switchChartPeriod(cryptoId, period) {
     updateChart(cryptoId, crypto_data[cryptoId] || {});
 }
 
-// Mettre à jour le graphique
 function updateChart(cryptoId, cryptoInfo) {
     const chartObj = charts[cryptoId];
     if (!chartObj) return;
@@ -329,14 +873,12 @@ function updateChart(cryptoId, cryptoInfo) {
     
     if (prices.length === 0) return;
     
-    // Limiter le nombre de points affichés selon la période
     const maxPoints = period === 'historical' ? 100 : 50;
     const step = Math.max(1, Math.floor(prices.length / maxPoints));
     
     const filteredPrices = prices.filter((_, index) => index % step === 0);
     const filteredTimestamps = timestamps.filter((_, index) => index % step === 0);
     
-    // Formater les labels selon la période
     chart.data.labels = filteredTimestamps.map(ts => {
         const date = new Date(ts);
         if (period === 'historical') {
@@ -354,7 +896,6 @@ function updateChart(cryptoId, cryptoInfo) {
     
     chart.data.datasets[0].data = filteredPrices;
     
-    // Mettre à jour la couleur en fonction de la tendance
     const isUpTrend = filteredPrices.length > 1 && 
                       filteredPrices[filteredPrices.length - 1] > filteredPrices[0];
     
@@ -365,174 +906,19 @@ function updateChart(cryptoId, cryptoInfo) {
     chart.update('none');
 }
 
-// Variable globale pour stocker les données
-let crypto_data = {};
-
-// Gestion des erreurs globales
-window.addEventListener('error', function(event) {
-    console.error('Erreur JavaScript:', event.error);
-});
-
-// État utilisateur
-let currentUser = null;
-let userSettings = {
-    theme: 'dark',
-    currency: 'usd',
-    autoRefresh: true,
-    priceAlerts: false,
-    marketAlerts: false
-};
-
-// Gestion des modales
-function openModal(modalId) {
-    document.getElementById(modalId).style.display = 'block';
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
-}
-
-// Gestion du login
-function handleLogin(username, password) {
-    // Simulation d'authentification
-    if (username && password) {
-        currentUser = {
-            name: username,
-            email: `${username}@crypto-trader.com`,
-            memberSince: 'Janvier 2024',
-            bio: 'Passionné de crypto-monnaies'
-        };
-        
-        updateUserInterface();
-        closeModal('login-modal');
-        showNotification('Connexion réussie !', 'success');
-    } else {
-        showNotification('Veuillez remplir tous les champs', 'error');
-    }
-}
-
-// Mise à jour de l'interface utilisateur
-function updateUserInterface() {
-    const loginBtn = document.getElementById('login-btn');
-    const profileBtn = document.getElementById('profile-btn');
-    
-    if (currentUser) {
-        loginBtn.textContent = '👤 ' + currentUser.name;
-        profileBtn.style.display = 'block';
-        
-        // Mettre à jour les informations du profil
-        document.getElementById('profile-name').textContent = currentUser.name;
-        document.getElementById('profile-email').textContent = currentUser.email;
-        document.getElementById('profile-member-since').textContent = 'Membre depuis: ' + currentUser.memberSince;
-    } else {
-        loginBtn.textContent = '🔐 Connexion';
-        profileBtn.style.display = 'none';
-    }
-}
-
-// Gestion de l'édition du profil
-function toggleProfileEdit() {
-    const profileView = document.getElementById('profile-view');
-    const profileEdit = document.getElementById('profile-edit');
-    
-    if (profileEdit.style.display === 'none') {
-        // Passer en mode édition
-        profileView.style.display = 'none';
-        profileEdit.style.display = 'block';
-        
-        // Pré-remplir les champs
-        if (currentUser) {
-            document.getElementById('edit-name').value = currentUser.name;
-            document.getElementById('edit-email').value = currentUser.email;
-            document.getElementById('edit-bio').value = currentUser.bio || '';
-        }
-    } else {
-        // Retour à la vue
-        profileView.style.display = 'block';
-        profileEdit.style.display = 'none';
-    }
-}
-
-// Sauvegarder le profil
-function saveProfile(formData) {
-    if (currentUser) {
-        currentUser.name = formData.get('name');
-        currentUser.email = formData.get('email');
-        currentUser.bio = formData.get('bio');
-        
-        updateUserInterface();
-        toggleProfileEdit();
-        showNotification('Profil mis à jour !', 'success');
-    }
-}
-
-// Déconnexion
-function logout() {
-    currentUser = null;
-    updateUserInterface();
-    closeModal('profile-modal');
-    showNotification('Déconnexion réussie', 'info');
-}
-
-// Sauvegarder les paramètres
-function saveSettings() {
-    userSettings.theme = document.getElementById('theme-select').value;
-    userSettings.currency = document.getElementById('currency-select').value;
-    userSettings.autoRefresh = document.getElementById('auto-refresh').checked;
-    userSettings.priceAlerts = document.getElementById('price-alerts').checked;
-    userSettings.marketAlerts = document.getElementById('market-alerts').checked;
-    
-    // Appliquer le thème
-    applyTheme(userSettings.theme);
-    
-    closeModal('settings-modal');
-    showNotification('Paramètres sauvegardés !', 'success');
-}
-
-// Appliquer le thème
-function applyTheme(theme) {
-    document.body.className = theme === 'light' ? 'light-theme' : 'dark-theme';
-}
-
-// Afficher une notification
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 15px 20px;
-        border-radius: 8px;
-        color: white;
-        font-weight: 600;
-        z-index: 1001;
-        animation: slideIn 0.3s ease;
-    `;
-    
-    switch(type) {
-        case 'success':
-            notification.style.background = 'linear-gradient(135deg, #4CAF50, #66BB6A)';
-            break;
-        case 'error':
-            notification.style.background = 'linear-gradient(135deg, #f44336, #EF5350)';
-            break;
-        default:
-            notification.style.background = 'linear-gradient(135deg, #2196F3, #42A5F5)';
-    }
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.remove();
-    }, 3000);
-}
-
-// Initialisation
+// ===== INITIALISATION =====
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard crypto initialisé');
+    console.log('Dashboard crypto Pro initialisé');
+    
+    // Charger les données sauvegardées
+    portfolio = JSON.parse(localStorage.getItem('portfolio')) || [];
+    transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+    alerts = JSON.parse(localStorage.getItem('alerts')) || [];
+    
+    // Initialiser les composants
     connectWebSocket();
+    setupSearch();
+    fetchNews();
     
     // Gestionnaires d'événements pour les boutons du menu
     document.getElementById('login-btn').addEventListener('click', () => {
@@ -543,24 +929,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    document.getElementById('profile-btn').addEventListener('click', () => {
-        openModal('profile-modal');
-    });
-    
+    document.getElementById('profile-btn').addEventListener('click', () => openModal('profile-modal'));
     document.getElementById('settings-btn').addEventListener('click', () => {
         openModal('settings-modal');
         // Charger les paramètres actuels
         document.getElementById('theme-select').value = userSettings.theme;
         document.getElementById('currency-select').value = userSettings.currency;
         document.getElementById('auto-refresh').checked = userSettings.autoRefresh;
+        document.getElementById('refresh-interval').value = userSettings.refreshInterval;
         document.getElementById('price-alerts').checked = userSettings.priceAlerts;
         document.getElementById('market-alerts').checked = userSettings.marketAlerts;
+        document.getElementById('news-notifications').checked = userSettings.newsNotifications;
+        document.getElementById('email-notifications').checked = userSettings.emailNotifications;
+        document.getElementById('animations-enabled').checked = userSettings.animationsEnabled;
+        document.getElementById('save-locally').checked = userSettings.saveLocally;
+        document.getElementById('default-exchange').value = userSettings.defaultExchange;
     });
     
+    document.getElementById('portfolio-btn').addEventListener('click', () => openModal('portfolio-modal'));
+    document.getElementById('alerts-btn').addEventListener('click', () => openModal('alerts-modal'));
+    document.getElementById('news-btn').addEventListener('click', () => openModal('news-modal'));
+    document.getElementById('tools-btn').addEventListener('click', () => openModal('tools-modal'));
+    
     // Gestionnaires pour fermer les modales
-    document.getElementById('close-login').addEventListener('click', () => closeModal('login-modal'));
-    document.getElementById('close-profile').addEventListener('click', () => closeModal('profile-modal'));
-    document.getElementById('close-settings').addEventListener('click', () => closeModal('settings-modal'));
+    document.querySelectorAll('.close').forEach(closeBtn => {
+        closeBtn.addEventListener('click', (e) => {
+            const modal = e.target.closest('.modal');
+            if (modal) modal.style.display = 'none';
+        });
+    });
     
     // Fermer les modales en cliquant à l'extérieur
     window.addEventListener('click', (event) => {
@@ -569,36 +966,116 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Formulaire de connexion
+    // Changement de vue
+    document.getElementById('view-mode').addEventListener('change', (e) => {
+        switchView(e.target.value);
+    });
+    
+    // Onglets des paramètres
+    document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            switchSettingsTab(btn.dataset.tab);
+        });
+    });
+    
+    // Formulaires
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         handleLogin(formData.get('username'), formData.get('password'));
     });
     
-    // Édition du profil
-    document.getElementById('edit-profile-btn').addEventListener('click', toggleProfileEdit);
-    document.getElementById('cancel-edit-btn').addEventListener('click', toggleProfileEdit);
-    
-    document.getElementById('profile-form').addEventListener('submit', (e) => {
+    document.getElementById('transaction-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
-        saveProfile(formData);
+        addTransaction({
+            type: formData.get('transaction-type'),
+            crypto: formData.get('transaction-crypto'),
+            quantity: parseFloat(formData.get('transaction-quantity')),
+            price: parseFloat(formData.get('transaction-price')),
+            fees: parseFloat(formData.get('transaction-fees')) || 0,
+            date: formData.get('transaction-date'),
+            notes: formData.get('transaction-notes')
+        });
+        closeModal('transaction-modal');
+        e.target.reset();
     });
     
-    // Déconnexion
-    document.getElementById('logout-btn').addEventListener('click', logout);
+    // Calculatrice P&L
+    document.getElementById('calculate-pnl').addEventListener('click', calculatePnL);
     
-    // Sauvegarder les paramètres
+    // Convertisseur
+    ['convert-amount', 'convert-from', 'convert-to'].forEach(id => {
+        document.getElementById(id).addEventListener('change', convertCurrency);
+    });
+    
+    // Autres gestionnaires
     document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
+    document.getElementById('add-transaction-btn').addEventListener('click', () => {
+        openModal('transaction-modal');
+        document.getElementById('transaction-date').value = new Date().toISOString().slice(0, 16);
+    });
     
-    // Initialiser l'interface utilisateur
-    updateUserInterface();
+    // Initialiser l'interface
+    applyTheme(userSettings.theme);
+    updateTransactionCount();
+    updatePortfolioValue();
 });
 
-// Gestion de la visibilité de la page pour économiser les ressources
+// Gestionnaire pour la visibilité de la page
 document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && ws.readyState !== WebSocket.OPEN) {
         connectWebSocket();
     }
 });
+
+// Fonctions globales pour les événements inline
+window.addToPortfolio = function(cryptoId) {
+    openModal('transaction-modal');
+    document.getElementById('transaction-crypto').value = cryptoId;
+    document.getElementById('transaction-type').value = 'buy';
+    document.getElementById('transaction-date').value = new Date().toISOString().slice(0, 16);
+};
+
+window.openAlertModal = function(cryptoId) {
+    const targetPrice = prompt(`Créer une alerte pour ${formatCryptoName(cryptoId)}.\nPrix cible ($):`);
+    if (targetPrice && !isNaN(targetPrice)) {
+        const condition = confirm('Alerte quand le prix DÉPASSE cette valeur?\n(Annuler = alerte quand le prix DESCEND sous cette valeur)') ? 'above' : 'below';
+        createAlert(cryptoId, parseFloat(targetPrice), condition);
+    }
+};
+
+window.handleLogin = function(username, password) {
+    if (username && password) {
+        currentUser = {
+            name: username,
+            email: `${username}@crypto-trader.com`,
+            memberSince: 'Janvier 2024',
+            bio: 'Passionné de crypto-monnaies'
+        };
+        
+        saveToLocalStorage('current-user', currentUser);
+        updateUserInterface();
+        closeModal('login-modal');
+        showNotification('Connexion réussie !', 'success');
+    } else {
+        showNotification('Veuillez remplir tous les champs', 'error');
+    }
+};
+
+window.updateUserInterface = function() {
+    const loginBtn = document.getElementById('login-btn');
+    const profileBtn = document.getElementById('profile-btn');
+    
+    if (currentUser) {
+        loginBtn.textContent = '👤 ' + currentUser.name;
+        profileBtn.style.display = 'block';
+        
+        updateElement('profile-name', currentUser.name);
+        updateElement('profile-email', currentUser.email);
+        updateElement('profile-member-since', 'Membre depuis: ' + currentUser.memberSince);
+    } else {
+        loginBtn.textContent = '🔐 Connexion';
+        profileBtn.style.display = 'none';
+    }
+};

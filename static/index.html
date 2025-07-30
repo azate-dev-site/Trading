@@ -4,30 +4,282 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Trading Dashboard</title>
+    <title>Crypto Trading Dashboard Pro</title>
     <link rel="stylesheet" href="/static/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 </head>
 <body>
     <div class="header">
         <nav class="navbar">
             <div class="nav-brand">
-                <h1>🚀 Crypto Trading Dashboard</h1>
+                <h1>🚀 Crypto Trading Dashboard Pro</h1>
             </div>
             <div class="nav-menu">
+                <button class="nav-btn" id="portfolio-btn">💰 Portfolio</button>
+                <button class="nav-btn" id="alerts-btn">🔔 Alertes</button>
+                <button class="nav-btn" id="news-btn">📰 Actualités</button>
+                <button class="nav-btn" id="tools-btn">🔧 Outils</button>
                 <button class="nav-btn" id="settings-btn">⚙️ Paramètres</button>
                 <button class="nav-btn" id="profile-btn">👤 Profil</button>
                 <button class="nav-btn" id="login-btn">🔐 Connexion</button>
             </div>
         </nav>
+        
+        <!-- Barre d'outils principale -->
+        <div class="toolbar">
+            <div class="search-container">
+                <input type="text" id="crypto-search" placeholder="🔍 Rechercher une crypto..." class="search-input">
+                <div id="search-results" class="search-results"></div>
+            </div>
+            <div class="toolbar-actions">
+                <button class="tool-btn" id="favorites-btn">⭐ Favoris</button>
+                <button class="tool-btn" id="compare-btn">⚖️ Comparer</button>
+                <button class="tool-btn" id="calculator-btn">🧮 Calculatrice</button>
+                <button class="tool-btn" id="export-btn">📊 Exporter</button>
+                <select id="view-mode" class="view-selector">
+                    <option value="grid">🔲 Grille</option>
+                    <option value="table">📋 Tableau</option>
+                    <option value="compact">📱 Compact</option>
+                </select>
+            </div>
+        </div>
+        
         <div id="status" class="status disconnected">Connexion en cours...</div>
+    </div>
+
+    <!-- Market Overview -->
+    <div class="market-overview">
+        <div class="market-stat">
+            <div class="stat-label">Cap. Marché Total</div>
+            <div class="stat-value" id="total-market-cap">$0</div>
+            <div class="stat-change" id="market-cap-change">0%</div>
+        </div>
+        <div class="market-stat">
+            <div class="stat-label">Volume 24h</div>
+            <div class="stat-value" id="total-volume">$0</div>
+            <div class="stat-change" id="volume-change">0%</div>
+        </div>
+        <div class="market-stat">
+            <div class="stat-label">Dominance BTC</div>
+            <div class="stat-value" id="btc-dominance">0%</div>
+        </div>
+        <div class="market-stat">
+            <div class="stat-label">Fear & Greed</div>
+            <div class="stat-value" id="fear-greed">50</div>
+            <div class="fear-greed-indicator" id="fear-greed-indicator"></div>
+        </div>
+    </div>
+
+    <!-- Modal Portfolio -->
+    <div id="portfolio-modal" class="modal">
+        <div class="modal-content large-modal">
+            <span class="close" id="close-portfolio">&times;</span>
+            <h2>💰 Mon Portfolio</h2>
+            <div class="portfolio-summary">
+                <div class="portfolio-stat">
+                    <h3>Valeur Totale</h3>
+                    <div class="portfolio-value" id="total-portfolio-value">$0.00</div>
+                </div>
+                <div class="portfolio-stat">
+                    <h3>P&L 24h</h3>
+                    <div class="portfolio-change" id="portfolio-24h-change">$0.00 (0%)</div>
+                </div>
+                <div class="portfolio-stat">
+                    <h3>P&L Total</h3>
+                    <div class="portfolio-change" id="portfolio-total-change">$0.00 (0%)</div>
+                </div>
+            </div>
+            <div class="portfolio-actions">
+                <button class="btn-primary" id="add-transaction-btn">➕ Ajouter Transaction</button>
+                <button class="btn-secondary" id="export-portfolio-btn">📊 Exporter Portfolio</button>
+            </div>
+            <div id="portfolio-chart-container" class="chart-container-large">
+                <canvas id="portfolio-chart"></canvas>
+            </div>
+            <div class="portfolio-holdings">
+                <h3>Mes Holdings</h3>
+                <div id="holdings-table" class="holdings-table"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Alertes -->
+    <div id="alerts-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-alerts">&times;</span>
+            <h2>🔔 Alertes de Prix</h2>
+            <div class="alerts-actions">
+                <button class="btn-primary" id="create-alert-btn">➕ Créer Alerte</button>
+            </div>
+            <div id="alerts-list" class="alerts-list"></div>
+        </div>
+    </div>
+
+    <!-- Modal Actualités -->
+    <div id="news-modal" class="modal">
+        <div class="modal-content large-modal">
+            <span class="close" id="close-news">&times;</span>
+            <h2>📰 Actualités Crypto</h2>
+            <div class="news-filters">
+                <select id="news-category">
+                    <option value="all">Toutes les catégories</option>
+                    <option value="bitcoin">Bitcoin</option>
+                    <option value="ethereum">Ethereum</option>
+                    <option value="defi">DeFi</option>
+                    <option value="nft">NFT</option>
+                </select>
+                <button class="btn-secondary" id="refresh-news-btn">🔄 Actualiser</button>
+            </div>
+            <div id="news-list" class="news-list"></div>
+        </div>
+    </div>
+
+    <!-- Modal Outils -->
+    <div id="tools-modal" class="modal">
+        <div class="modal-content large-modal">
+            <span class="close" id="close-tools">&times;</span>
+            <h2>🔧 Outils de Trading</h2>
+            <div class="tools-grid">
+                <div class="tool-card">
+                    <h3>💱 Convertisseur</h3>
+                    <div class="converter">
+                        <input type="number" id="convert-amount" placeholder="Montant">
+                        <select id="convert-from">
+                            <option value="btc">Bitcoin</option>
+                            <option value="eth">Ethereum</option>
+                            <option value="usd">USD</option>
+                            <option value="eur">EUR</option>
+                        </select>
+                        <span>→</span>
+                        <select id="convert-to">
+                            <option value="usd">USD</option>
+                            <option value="eur">EUR</option>
+                            <option value="btc">Bitcoin</option>
+                            <option value="eth">Ethereum</option>
+                        </select>
+                        <div class="conversion-result" id="conversion-result">0</div>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>🧮 Calculatrice P&L</h3>
+                    <div class="pnl-calculator">
+                        <input type="number" id="buy-price" placeholder="Prix d'achat">
+                        <input type="number" id="sell-price" placeholder="Prix de vente">
+                        <input type="number" id="quantity" placeholder="Quantité">
+                        <button class="btn-primary" id="calculate-pnl">Calculer</button>
+                        <div class="pnl-result" id="pnl-result"></div>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>📊 Analyse Technique</h3>
+                    <div class="technical-analysis">
+                        <select id="ta-crypto">
+                            <option value="bitcoin">Bitcoin</option>
+                            <option value="ethereum">Ethereum</option>
+                        </select>
+                        <div class="ta-indicators">
+                            <div class="indicator">
+                                <span>RSI (14):</span>
+                                <span id="rsi-value">-</span>
+                            </div>
+                            <div class="indicator">
+                                <span>MACD:</span>
+                                <span id="macd-value">-</span>
+                            </div>
+                            <div class="indicator">
+                                <span>MA (20):</span>
+                                <span id="ma20-value">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tool-card">
+                    <h3>🎯 Support/Résistance</h3>
+                    <div class="support-resistance">
+                        <div class="sr-level resistance">
+                            <span>Résistance:</span>
+                            <span id="resistance-level">$0</span>
+                        </div>
+                        <div class="sr-level support">
+                            <span>Support:</span>
+                            <span id="support-level">$0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Transaction -->
+    <div id="transaction-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-transaction">&times;</span>
+            <h2>💰 Ajouter Transaction</h2>
+            <form id="transaction-form">
+                <div class="form-group">
+                    <label>Type de transaction:</label>
+                    <select id="transaction-type" required>
+                        <option value="buy">🟢 Achat</option>
+                        <option value="sell">🔴 Vente</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Crypto-monnaie:</label>
+                    <select id="transaction-crypto" required>
+                        <option value="bitcoin">Bitcoin (BTC)</option>
+                        <option value="ethereum">Ethereum (ETH)</option>
+                        <option value="binancecoin">Binance Coin (BNB)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantité:</label>
+                    <input type="number" id="transaction-quantity" step="0.00000001" required>
+                </div>
+                <div class="form-group">
+                    <label>Prix unitaire ($):</label>
+                    <input type="number" id="transaction-price" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Date:</label>
+                    <input type="datetime-local" id="transaction-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Frais ($):</label>
+                    <input type="number" id="transaction-fees" step="0.01" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Notes:</label>
+                    <textarea id="transaction-notes" placeholder="Notes optionnelles..."></textarea>
+                </div>
+                <button type="submit" class="btn-primary">💾 Sauvegarder</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Comparaison -->
+    <div id="compare-modal" class="modal">
+        <div class="modal-content large-modal">
+            <span class="close" id="close-compare">&times;</span>
+            <h2>⚖️ Comparaison de Cryptos</h2>
+            <div class="compare-selection">
+                <select id="compare-crypto1">
+                    <option value="">Sélectionner crypto 1</option>
+                </select>
+                <select id="compare-crypto2">
+                    <option value="">Sélectionner crypto 2</option>
+                </select>
+                <button class="btn-primary" id="start-compare">Comparer</button>
+            </div>
+            <div id="comparison-result" class="comparison-result"></div>
+        </div>
     </div>
 
     <!-- Modal Login -->
     <div id="login-modal" class="modal">
         <div class="modal-content">
             <span class="close" id="close-login">&times;</span>
-            <h2>Connexion</h2>
+            <h2>🔐 Connexion</h2>
             <form id="login-form">
                 <div class="form-group">
                     <label for="username">Nom d'utilisateur:</label>
@@ -47,13 +299,23 @@
     <div id="profile-modal" class="modal">
         <div class="modal-content">
             <span class="close" id="close-profile">&times;</span>
-            <h2>Profil Utilisateur</h2>
+            <h2>👤 Profil Utilisateur</h2>
             <div id="profile-view">
                 <div class="profile-info">
                     <div class="profile-avatar">👤</div>
                     <h3 id="profile-name">Utilisateur</h3>
                     <p id="profile-email">email@exemple.com</p>
                     <p id="profile-member-since">Membre depuis: Janvier 2024</p>
+                    <div class="profile-stats">
+                        <div class="profile-stat">
+                            <span>Transactions:</span>
+                            <span id="profile-transactions">0</span>
+                        </div>
+                        <div class="profile-stat">
+                            <span>Portfolio:</span>
+                            <span id="profile-portfolio-value">$0</span>
+                        </div>
+                    </div>
                 </div>
                 <button class="btn-primary" id="edit-profile-btn">Modifier le profil</button>
                 <button class="btn-secondary" id="logout-btn">Se déconnecter</button>
@@ -83,51 +345,130 @@
     <div id="settings-modal" class="modal">
         <div class="modal-content">
             <span class="close" id="close-settings">&times;</span>
-            <h2>Paramètres</h2>
-            <div class="settings-section">
-                <h3>Préférences d'affichage</h3>
-                <div class="form-group">
-                    <label for="theme-select">Thème:</label>
-                    <select id="theme-select">
-                        <option value="dark">Sombre</option>
-                        <option value="light">Clair</option>
-                        <option value="auto">Automatique</option>
-                    </select>
+            <h2>⚙️ Paramètres</h2>
+            <div class="settings-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-btn active" data-tab="display">🎨 Affichage</button>
+                    <button class="tab-btn" data-tab="notifications">🔔 Notifications</button>
+                    <button class="tab-btn" data-tab="trading">💰 Trading</button>
+                    <button class="tab-btn" data-tab="data">📊 Données</button>
                 </div>
-                <div class="form-group">
-                    <label for="currency-select">Devise:</label>
-                    <select id="currency-select">
-                        <option value="usd">USD ($)</option>
-                        <option value="eur">EUR (€)</option>
-                        <option value="btc">BTC (₿)</option>
-                    </select>
+                
+                <div class="tab-content active" id="display-tab">
+                    <div class="form-group">
+                        <label for="theme-select">Thème:</label>
+                        <select id="theme-select">
+                            <option value="dark">🌙 Sombre</option>
+                            <option value="light">☀️ Clair</option>
+                            <option value="auto">🔄 Automatique</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="currency-select">Devise principale:</label>
+                        <select id="currency-select">
+                            <option value="usd">💵 USD ($)</option>
+                            <option value="eur">💶 EUR (€)</option>
+                            <option value="btc">₿ BTC</option>
+                            <option value="eth">⧫ ETH</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="animations-enabled"> Animations activées
+                        </label>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="auto-refresh"> Actualisation automatique
-                    </label>
+                
+                <div class="tab-content" id="notifications-tab">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="price-alerts"> 📈 Alertes de prix
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="market-alerts"> 📊 Alertes de marché
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="news-notifications"> 📰 Notifications d'actualités
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="email-notifications"> 📧 Notifications par email
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="trading-tab">
+                    <div class="form-group">
+                        <label for="default-exchange">Exchange par défaut:</label>
+                        <select id="default-exchange">
+                            <option value="binance">Binance</option>
+                            <option value="coinbase">Coinbase</option>
+                            <option value="kraken">Kraken</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-refresh"> 🔄 Actualisation automatique
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="refresh-interval">Intervalle de mise à jour (secondes):</label>
+                        <input type="number" id="refresh-interval" min="1" max="60" value="5">
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="data-tab">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="save-locally"> 💾 Sauvegarder localement
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn-secondary" id="export-settings">📤 Exporter paramètres</button>
+                        <button class="btn-secondary" id="import-settings">📥 Importer paramètres</button>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn-danger" id="clear-data">🗑️ Effacer toutes les données</button>
+                    </div>
                 </div>
             </div>
-            <div class="settings-section">
-                <h3>Notifications</h3>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="price-alerts"> Alertes de prix
-                    </label>
-                </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="market-alerts"> Alertes de marché
-                    </label>
-                </div>
-            </div>
-            <button class="btn-primary" id="save-settings-btn">Sauvegarder les paramètres</button>
+            <button class="btn-primary" id="save-settings-btn">💾 Sauvegarder les paramètres</button>
         </div>
     </div>
     
-    <div id="crypto-grid" class="crypto-grid">
-        <!-- Les cartes crypto seront générées dynamiquement -->
+    <!-- Affichage principal -->
+    <div id="main-content">
+        <div id="crypto-grid" class="crypto-grid">
+            <!-- Les cartes crypto seront générées dynamiquement -->
+        </div>
+        
+        <div id="crypto-table" class="crypto-table" style="display: none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>⭐</th>
+                        <th>Crypto</th>
+                        <th>Prix</th>
+                        <th>24h %</th>
+                        <th>7j %</th>
+                        <th>Volume 24h</th>
+                        <th>Market Cap</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="crypto-table-body">
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    <!-- Notifications Toast -->
+    <div id="notifications-container" class="notifications-container"></div>
 
     <script src="/static/app.js"></script>
 </body>
