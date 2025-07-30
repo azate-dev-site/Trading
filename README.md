@@ -86,10 +86,9 @@ graph TD
 ### 1️⃣ **Installation**
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/crypto-trading-dashboard.git
-
+git clone https://github.com/azate-dev-site/Trading.git
 # Navigate to project directory
-cd crypto-trading-dashboard
+cd Trading
 
 # Install dependencies
 pip install -r requirements.txt
