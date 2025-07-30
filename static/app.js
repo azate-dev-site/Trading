@@ -6,6 +6,7 @@ let portfolio = [];
 let transactions = [];
 let alerts = [];
 let favorites = JSON.parse(localStorage.getItem('crypto-favorites')) || [];
+let connectedWallets = JSON.parse(localStorage.getItem('connected-wallets')) || [];
 let userSettings = JSON.parse(localStorage.getItem('user-settings')) || {
     theme: 'dark',
     currency: 'usd',
@@ -454,6 +455,183 @@ function convertCurrency() {
     
     document.getElementById('conversion-result').textContent = 
         `${result.toFixed(8)} ${to.toUpperCase()}`;
+}
+
+// ===== GESTION DES WALLETS =====
+async function connectWallet(walletType, credentials) {
+    try {
+        const response = await fetch('/api/wallet/connect?user_id=' + (currentUser?.name || 'default_user'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                wallet_type: walletType,
+                ...credentials
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            connectedWallets.push(result.wallet_info);
+            saveToLocalStorage('connected-wallets', connectedWallets);
+            updateWalletsDisplay();
+            showNotification(`Wallet ${walletType} connecté avec succès!`, 'success');
+            return result;
+        } else {
+            showNotification(result.message, 'error');
+            return null;
+        }
+    } catch (error) {
+        console.error('Erreur connexion wallet:', error);
+        showNotification('Erreur lors de la connexion du wallet', 'error');
+        return null;
+    }
+}
+
+async function disconnectWallet(walletType) {
+    try {
+        const response = await fetch('/api/wallet/disconnect?user_id=' + (currentUser?.name || 'default_user'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                wallet_type: walletType
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            connectedWallets = connectedWallets.filter(w => w.type !== walletType);
+            saveToLocalStorage('connected-wallets', connectedWallets);
+            updateWalletsDisplay();
+            showNotification(`Wallet ${walletType} déconnecté`, 'info');
+        }
+    } catch (error) {
+        console.error('Erreur déconnexion wallet:', error);
+        showNotification('Erreur lors de la déconnexion', 'error');
+    }
+}
+
+async function loadUserWallets(userId) {
+    try {
+        const response = await fetch(`/api/wallet/list/${userId}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            connectedWallets = result.wallets;
+            saveToLocalStorage('connected-wallets', connectedWallets);
+            updateWalletsDisplay();
+        }
+    } catch (error) {
+        console.error('Erreur chargement wallets:', error);
+    }
+}
+
+async function getWalletTransactions(walletType, limit = 50) {
+    try {
+        const userId = currentUser?.name || 'default_user';
+        const response = await fetch(`/api/wallet/transactions/${userId}/${walletType}?limit=${limit}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            return result.transactions;
+        }
+        return [];
+    } catch (error) {
+        console.error('Erreur récupération transactions:', error);
+        return [];
+    }
+}
+
+function updateWalletsDisplay() {
+    const walletsList = document.getElementById('connected-wallets-list');
+    if (!walletsList) return;
+    
+    walletsList.innerHTML = connectedWallets.map(wallet => {
+        let balanceInfo = '';
+        if (wallet.type === 'binance') {
+            const mainBalances = wallet.balances?.filter(b => parseFloat(b.free) > 0).slice(0, 3) || [];
+            balanceInfo = mainBalances.map(b => `${b.asset}: ${parseFloat(b.free).toFixed(4)}`).join('<br>');
+        } else if (wallet.type === 'metamask') {
+            balanceInfo = `ETH: ${wallet.balance_eth?.toFixed(6) || '0'}`;
+        }
+        
+        return `
+            <div class="wallet-card">
+                <div class="wallet-header">
+                    <span class="wallet-name">${getWalletDisplayName(wallet.type)}</span>
+                    <span class="wallet-status ${wallet.status}">${wallet.status}</span>
+                </div>
+                <div class="wallet-balance">
+                    ${balanceInfo}
+                </div>
+                <div class="wallet-actions">
+                    <button class="btn-secondary" onclick="viewWalletDetails('${wallet.type}')">📊 Détails</button>
+                    <button class="btn-danger" onclick="disconnectWallet('${wallet.type}')">🔌 Déconnecter</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getWalletDisplayName(walletType) {
+    const names = {
+        'binance': '🟡 Binance',
+        'metamask': '🦊 MetaMask',
+        'trust_wallet': '💙 Trust Wallet',
+        'cake_wallet': '🍰 Cake Wallet',
+        'coinbase': '🟦 Coinbase'
+    };
+    return names[walletType] || walletType;
+}
+
+async function viewWalletDetails(walletType) {
+    const wallet = connectedWallets.find(w => w.type === walletType);
+    if (!wallet) return;
+    
+    // Charger les transactions récentes
+    const transactions = await getWalletTransactions(walletType);
+    
+    // Afficher dans une modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content large-modal">
+            <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+            <h2>${getWalletDisplayName(walletType)} - Détails</h2>
+            <div class="wallet-details">
+                <div class="wallet-overview">
+                    <h3>Informations générales</h3>
+                    <p><strong>Status:</strong> ${wallet.status}</p>
+                    <p><strong>Dernière mise à jour:</strong> ${new Date(wallet.last_update).toLocaleString()}</p>
+                    ${wallet.address ? `<p><strong>Adresse:</strong> ${wallet.address}</p>` : ''}
+                </div>
+                <div class="wallet-transactions">
+                    <h3>Transactions récentes</h3>
+                    <div class="transactions-list">
+                        ${transactions.length > 0 ? 
+                            transactions.slice(0, 10).map(tx => `
+                                <div class="transaction-item">
+                                    <span>${tx.symbol || 'N/A'}</span>
+                                    <span>${tx.side || tx.type || 'N/A'}</span>
+                                    <span>${tx.quantity || tx.value || 'N/A'}</span>
+                                    <span>${new Date(tx.time || tx.timestamp).toLocaleDateString()}</span>
+                                </div>
+                            `).join('') : 
+                            '<p>Aucune transaction trouvée</p>'
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
 
 // ===== GESTION DES FAVORIS =====
@@ -966,6 +1144,98 @@ function updateChart(cryptoId, cryptoInfo) {
     
     chart.update('none');
 }
+
+// Fonction pour ouvrir la modal de connexion wallet
+window.openWalletConnectionModal = function(walletType) {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    
+    let formContent = '';
+    
+    if (walletType === 'binance') {
+        formContent = `
+            <div class="form-group">
+                <label for="binance-api-key">Clé API Binance:</label>
+                <input type="text" id="binance-api-key" placeholder="Votre clé API Binance" required>
+            </div>
+            <div class="form-group">
+                <label for="binance-secret-key">Clé Secrète Binance:</label>
+                <input type="password" id="binance-secret-key" placeholder="Votre clé secrète Binance" required>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="binance-testnet"> Utiliser Testnet
+                </label>
+            </div>
+        `;
+    } else if (walletType === 'metamask') {
+        formContent = `
+            <div class="form-group">
+                <label for="wallet-address">Adresse du Wallet:</label>
+                <input type="text" id="wallet-address" placeholder="0x..." required>
+            </div>
+            <div class="form-group">
+                <label for="infura-project-id">Project ID Infura:</label>
+                <input type="text" id="infura-project-id" placeholder="Votre Project ID Infura" required>
+            </div>
+        `;
+    } else if (walletType === 'cake_wallet') {
+        formContent = `
+            <div class="form-group">
+                <label for="cake-api-key">Clé API Cake Wallet:</label>
+                <input type="text" id="cake-api-key" placeholder="Votre clé API Cake Wallet" required>
+            </div>
+        `;
+    }
+    
+    modal.innerHTML = `
+        <div class="modal-content">
+            <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+            <h2>🔐 Connecter ${getWalletDisplayName(walletType)}</h2>
+            <form id="wallet-connection-form">
+                ${formContent}
+                <div class="wallet-security-notice">
+                    <p>🔒 <strong>Sécurité:</strong> Vos clés API sont stockées de manière sécurisée et chiffrée. Nous recommandons d'utiliser des permissions lecture seule.</p>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">🔌 Connecter</button>
+                    <button type="button" class="btn-secondary" onclick="this.closest('.modal').remove()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    modal.querySelector('#wallet-connection-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        let credentials = {};
+        
+        if (walletType === 'binance') {
+            credentials = {
+                api_key: document.getElementById('binance-api-key').value,
+                secret_key: document.getElementById('binance-secret-key').value,
+                testnet: document.getElementById('binance-testnet').checked
+            };
+        } else if (walletType === 'metamask') {
+            credentials = {
+                wallet_address: document.getElementById('wallet-address').value,
+                infura_project_id: document.getElementById('infura-project-id').value
+            };
+        } else if (walletType === 'cake_wallet') {
+            credentials = {
+                api_key: document.getElementById('cake-api-key').value
+            };
+        }
+        
+        const result = await connectWallet(walletType, credentials);
+        if (result) {
+            modal.remove();
+        }
+    });
+    
+    document.body.appendChild(modal);
+};
 
 // ===== INITIALISATION =====
 document.addEventListener('DOMContentLoaded', function() {

@@ -4,10 +4,12 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List
 import aiohttp
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import uvicorn
+from wallet_manager import wallet_manager
 
 app = FastAPI(title="Crypto Trading Dashboard")
 
@@ -16,6 +18,18 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Store pour les connexions WebSocket
 connections: List[WebSocket] = []
+
+# Modèles Pydantic pour les wallets
+class WalletConnectionRequest(BaseModel):
+    wallet_type: str
+    api_key: Optional[str] = None
+    secret_key: Optional[str] = None
+    wallet_address: Optional[str] = None
+    infura_project_id: Optional[str] = None
+    testnet: Optional[bool] = False
+
+class WalletDisconnectRequest(BaseModel):
+    wallet_type: str
 
 # Cache pour les données crypto
 crypto_data: Dict = {}
@@ -193,6 +207,85 @@ async def refresh_prices():
         return {"status": "success", "message": "Prix actualisés", "timestamp": datetime.now().isoformat()}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.post("/api/wallet/connect")
+async def connect_wallet(request: WalletConnectionRequest, user_id: str = "default_user"):
+    """Connecter un wallet à l'utilisateur"""
+    try:
+        if request.wallet_type == 'binance':
+            if not request.api_key or not request.secret_key:
+                raise HTTPException(status_code=400, detail="API key et secret key requis pour Binance")
+            
+            result = await wallet_manager.connect_binance_wallet(
+                user_id, 
+                request.api_key, 
+                request.secret_key, 
+                request.testnet or False
+            )
+            
+        elif request.wallet_type == 'metamask':
+            if not request.wallet_address or not request.infura_project_id:
+                raise HTTPException(status_code=400, detail="Adresse wallet et Project ID Infura requis pour MetaMask")
+            
+            result = await wallet_manager.connect_metamask_wallet(
+                user_id,
+                request.wallet_address,
+                request.infura_project_id
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"Type de wallet non supporté: {request.wallet_type}")
+            
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/wallet/list/{user_id}")
+async def list_user_wallets(user_id: str):
+    """Lister tous les wallets d'un utilisateur"""
+    try:
+        wallets = wallet_manager.get_user_wallets(user_id)
+        return {
+            'success': True,
+            'wallets': wallets,
+            'count': len(wallets)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/wallet/disconnect")
+async def disconnect_wallet(request: WalletDisconnectRequest, user_id: str = "default_user"):
+    """Déconnecter un wallet"""
+    try:
+        success = wallet_manager.disconnect_wallet(user_id, request.wallet_type)
+        return {
+            'success': success,
+            'message': f'Wallet {request.wallet_type} déconnecté' if success else 'Wallet non trouvé'
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/wallet/transactions/{user_id}/{wallet_type}")
+async def get_wallet_transactions(user_id: str, wallet_type: str, limit: int = 50):
+    """Récupérer les transactions d'un wallet"""
+    try:
+        transactions = await wallet_manager.get_wallet_transactions(user_id, wallet_type, limit)
+        return {
+            'success': True,
+            'transactions': transactions,
+            'count': len(transactions)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/wallet/update-balances/{user_id}")
+async def update_wallet_balances(user_id: str):
+    """Mettre à jour les soldes de tous les wallets"""
+    try:
+        result = await wallet_manager.update_wallet_balances(user_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
