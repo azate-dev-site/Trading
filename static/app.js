@@ -130,6 +130,87 @@ function connectWebSocket() {
     };
 }
 
+// ===== FONCTIONS BARRE D'OUTILS =====
+function showFavorites() {
+    const grid = document.getElementById('crypto-grid');
+    const cards = grid.querySelectorAll('.crypto-card');
+    
+    // Masquer toutes les cartes d'abord
+    cards.forEach(card => {
+        card.style.display = 'none';
+    });
+    
+    // Afficher seulement les favoris
+    if (favorites.length === 0) {
+        showNotification('Aucun favori trouvé. Ajoutez des cryptos à vos favoris !', 'info');
+        cards.forEach(card => card.style.display = 'block');
+        return;
+    }
+    
+    let favoritesFound = 0;
+    favorites.forEach(cryptoId => {
+        const card = document.getElementById(`card-${cryptoId}`);
+        if (card) {
+            card.style.display = 'block';
+            favoritesFound++;
+        }
+    });
+    
+    if (favoritesFound === 0) {
+        showNotification('Les cryptos favorites ne sont pas encore chargées', 'warning');
+        cards.forEach(card => card.style.display = 'block');
+    } else {
+        showNotification(`${favoritesFound} crypto(s) favorite(s) affichée(s)`, 'success');
+        
+        // Bouton pour revenir à la vue complète
+        const resetBtn = document.createElement('button');
+        resetBtn.textContent = '↩️ Voir toutes les cryptos';
+        resetBtn.className = 'tool-btn';
+        resetBtn.style.position = 'fixed';
+        resetBtn.style.top = '120px';
+        resetBtn.style.right = '20px';
+        resetBtn.style.zIndex = '1000';
+        resetBtn.onclick = () => {
+            cards.forEach(card => card.style.display = 'block');
+            resetBtn.remove();
+            showNotification('Vue complète restaurée', 'info');
+        };
+        document.body.appendChild(resetBtn);
+    }
+}
+
+function exportData() {
+    const dataToExport = {
+        portfolio: portfolio,
+        transactions: transactions,
+        alerts: alerts,
+        favorites: favorites,
+        settings: userSettings,
+        exportDate: new Date().toISOString(),
+        cryptoData: Object.keys(crypto_data).reduce((acc, key) => {
+            acc[key] = {
+                current: crypto_data[key].current,
+                stats: crypto_data[key].stats
+            };
+            return acc;
+        }, {})
+    };
+    
+    const dataStr = JSON.stringify(dataToExport, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `crypto-dashboard-export-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    showNotification('Données exportées avec succès !', 'success');
+}
+
 // ===== RAFRAÎCHISSEMENT MANUEL =====
 async function refreshPrices() {
     const refreshBtn = document.getElementById('refresh-prices-btn');
@@ -174,6 +255,7 @@ function updateCryptoData(data) {
     }
     
     updateSearchResults();
+    populateCompareSelectors();
 }
 
 function updateCryptoGrid(data) {
@@ -579,6 +661,181 @@ function updateFearGreedIndicator(value) {
     
     indicator.style.background = color;
     indicator.textContent = text;
+}
+
+// ===== COMPARAISON DE CRYPTOS =====
+function populateCompareSelectors() {
+    const select1 = document.getElementById('compare-crypto1');
+    const select2 = document.getElementById('compare-crypto2');
+    
+    if (!select1 || !select2) return;
+    
+    // Vider les sélecteurs
+    select1.innerHTML = '<option value="">Sélectionner crypto 1</option>';
+    select2.innerHTML = '<option value="">Sélectionner crypto 2</option>';
+    
+    // Ajouter toutes les cryptos disponibles
+    Object.keys(crypto_data).forEach(cryptoId => {
+        const option1 = document.createElement('option');
+        option1.value = cryptoId;
+        option1.textContent = formatCryptoName(cryptoId);
+        select1.appendChild(option1);
+        
+        const option2 = document.createElement('option');
+        option2.value = cryptoId;
+        option2.textContent = formatCryptoName(cryptoId);
+        select2.appendChild(option2);
+    });
+}
+
+function compareCryptos() {
+    const crypto1Id = document.getElementById('compare-crypto1').value;
+    const crypto2Id = document.getElementById('compare-crypto2').value;
+    const resultDiv = document.getElementById('comparison-result');
+    
+    if (!crypto1Id || !crypto2Id) {
+        showNotification('Veuillez sélectionner deux cryptos à comparer', 'warning');
+        return;
+    }
+    
+    if (crypto1Id === crypto2Id) {
+        showNotification('Veuillez sélectionner deux cryptos différentes', 'warning');
+        return;
+    }
+    
+    const crypto1 = crypto_data[crypto1Id];
+    const crypto2 = crypto_data[crypto2Id];
+    
+    if (!crypto1 || !crypto2 || !crypto1.current || !crypto2.current) {
+        showNotification('Données non disponibles pour la comparaison', 'error');
+        return;
+    }
+    
+    const comparison = {
+        crypto1: {
+            name: formatCryptoName(crypto1Id),
+            price: crypto1.current.usd || 0,
+            change24h: crypto1.current.usd_24h_change || 0,
+            volume: crypto1.current.usd_24h_vol || 0,
+            marketCap: crypto1.stats?.market_cap || 0,
+            yearChange: crypto1.stats?.year_change || 0
+        },
+        crypto2: {
+            name: formatCryptoName(crypto2Id),
+            price: crypto2.current.usd || 0,
+            change24h: crypto2.current.usd_24h_change || 0,
+            volume: crypto2.current.usd_24h_vol || 0,
+            marketCap: crypto2.stats?.market_cap || 0,
+            yearChange: crypto2.stats?.year_change || 0
+        }
+    };
+    
+    resultDiv.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+            <div class="comparison-card">
+                <h3>${comparison.crypto1.name}</h3>
+                <div class="comparison-stats">
+                    <div class="comparison-stat">
+                        <span>Prix:</span>
+                        <span class="stat-price">$${formatPrice(comparison.crypto1.price)}</span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>24h:</span>
+                        <span class="${comparison.crypto1.change24h >= 0 ? 'positive' : 'negative'}">
+                            ${comparison.crypto1.change24h.toFixed(2)}%
+                        </span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>1 an:</span>
+                        <span class="${comparison.crypto1.yearChange >= 0 ? 'positive' : 'negative'}">
+                            ${comparison.crypto1.yearChange.toFixed(2)}%
+                        </span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>Volume 24h:</span>
+                        <span>$${formatPrice(comparison.crypto1.volume)}</span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>Market Cap:</span>
+                        <span>$${formatPrice(comparison.crypto1.marketCap)}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="comparison-card">
+                <h3>${comparison.crypto2.name}</h3>
+                <div class="comparison-stats">
+                    <div class="comparison-stat">
+                        <span>Prix:</span>
+                        <span class="stat-price">$${formatPrice(comparison.crypto2.price)}</span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>24h:</span>
+                        <span class="${comparison.crypto2.change24h >= 0 ? 'positive' : 'negative'}">
+                            ${comparison.crypto2.change24h.toFixed(2)}%
+                        </span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>1 an:</span>
+                        <span class="${comparison.crypto2.yearChange >= 0 ? 'positive' : 'negative'}">
+                            ${comparison.crypto2.yearChange.toFixed(2)}%
+                        </span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>Volume 24h:</span>
+                        <span>$${formatPrice(comparison.crypto2.volume)}</span>
+                    </div>
+                    <div class="comparison-stat">
+                        <span>Market Cap:</span>
+                        <span>$${formatPrice(comparison.crypto2.marketCap)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="comparison-analysis" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 10px;">
+            <h4>🔍 Analyse comparative</h4>
+            <div class="analysis-points">
+                ${generateComparisonAnalysis(comparison)}
+            </div>
+        </div>
+    `;
+    
+    showNotification('Comparaison générée avec succès !', 'success');
+}
+
+function generateComparisonAnalysis(comparison) {
+    const points = [];
+    const c1 = comparison.crypto1;
+    const c2 = comparison.crypto2;
+    
+    // Comparaison des prix
+    if (c1.price > c2.price) {
+        points.push(`💰 ${c1.name} est ${((c1.price / c2.price - 1) * 100).toFixed(1)}% plus cher que ${c2.name}`);
+    } else {
+        points.push(`💰 ${c2.name} est ${((c2.price / c1.price - 1) * 100).toFixed(1)}% plus cher que ${c1.name}`);
+    }
+    
+    // Comparaison performance 24h
+    if (c1.change24h > c2.change24h) {
+        points.push(`📈 ${c1.name} performe mieux sur 24h (+${c1.change24h.toFixed(2)}% vs ${c2.change24h.toFixed(2)}%)`);
+    } else {
+        points.push(`📈 ${c2.name} performe mieux sur 24h (+${c2.change24h.toFixed(2)}% vs ${c1.change24h.toFixed(2)}%)`);
+    }
+    
+    // Comparaison volume
+    if (c1.volume > c2.volume) {
+        points.push(`📊 ${c1.name} a un volume de trading supérieur (${((c1.volume / c2.volume - 1) * 100).toFixed(1)}% de plus)`);
+    } else {
+        points.push(`📊 ${c2.name} a un volume de trading supérieur (${((c2.volume / c1.volume - 1) * 100).toFixed(1)}% de plus)`);
+    }
+    
+    // Comparaison market cap
+    if (c1.marketCap > c2.marketCap) {
+        points.push(`🏆 ${c1.name} a une capitalisation boursière plus élevée`);
+    } else {
+        points.push(`🏆 ${c2.name} a une capitalisation boursière plus élevée`);
+    }
+    
+    return points.map(point => `<div style="margin-bottom: 8px;">• ${point}</div>`).join('');
 }
 
 // ===== GESTION DES VUES =====
@@ -1005,6 +1262,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Bouton de rafraîchissement manuel
     document.getElementById('refresh-prices-btn').addEventListener('click', refreshPrices);
     
+    // Boutons de la barre d'outils
+    document.getElementById('favorites-btn').addEventListener('click', showFavorites);
+    document.getElementById('compare-btn').addEventListener('click', () => openModal('compare-modal'));
+    document.getElementById('calculator-btn').addEventListener('click', () => openModal('tools-modal'));
+    document.getElementById('export-btn').addEventListener('click', exportData);
+    
     // Onglets des paramètres
     document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1049,6 +1312,12 @@ document.addEventListener('DOMContentLoaded', function() {
         openModal('transaction-modal');
         document.getElementById('transaction-date').value = new Date().toISOString().slice(0, 16);
     });
+    
+    // Comparaison de cryptos
+    document.getElementById('start-compare').addEventListener('click', compareCryptos);
+    
+    // Initialiser les sélecteurs de comparaison
+    populateCompareSelectors();
     
     // Initialiser l'interface
     applyTheme(userSettings.theme);

@@ -1,4 +1,3 @@
-
 /* Reset et styles de base */
 * {
     margin: 0;
@@ -1276,7 +1275,7 @@ body::before {
         grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
         gap: 20px;
     }
-    
+
     .toolbar, #main-content {
         padding-left: 24px;
         padding-right: 24px;
@@ -1301,57 +1300,57 @@ body::before {
         flex-direction: column;
         gap: 16px;
     }
-    
+
     .nav-brand h1 {
         font-size: 1.5rem;
         text-align: center;
     }
-    
+
     .nav-menu {
         flex-wrap: wrap;
         justify-content: center;
         gap: 6px;
     }
-    
+
     .nav-btn {
         padding: 6px 12px;
         font-size: 0.8125rem;
     }
-    
+
     .toolbar {
         flex-direction: column;
         align-items: stretch;
         padding: 0 20px;
         gap: 16px;
     }
-    
+
     .toolbar-actions {
         justify-content: center;
     }
-    
+
     .market-overview {
         grid-template-columns: 1fr;
         margin: 0 20px 24px;
     }
-    
+
     #main-content {
         padding: 0 20px 24px;
     }
-    
+
     .modal-content {
         width: 95%;
         margin: 2% auto;
         padding: 24px 20px;
     }
-    
+
     .portfolio-summary {
         grid-template-columns: 1fr;
     }
-    
+
     .portfolio-actions {
         flex-direction: column;
     }
-    
+
     .notifications-container {
         left: 10px;
         right: 10px;
@@ -1377,24 +1376,24 @@ body::before {
     .crypto-card {
         padding: 20px;
     }
-    
+
     .nav-menu {
         width: 100%;
     }
-    
+
     .nav-btn {
         flex: 1;
         min-width: 100px;
     }
-    
+
     .tab-buttons {
         flex-direction: column;
     }
-    
+
     .converter {
         flex-direction: column;
     }
-    
+
     .card-actions {
         flex-direction: column;
     }
@@ -1483,3 +1482,57 @@ body::before {
     background: rgba(76, 175, 80, 0.3);
     color: #ffffff;
 }
+
+/* Comparaison */
+.comparison-card {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.comparison-card h3 {
+    color: #4CAF50;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.comparison-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.comparison-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.comparison-stat:last-child {
+    border-bottom: none;
+}
+
+.comparison-stat .stat-price {
+    font-weight: 700;
+    font-size: 1.1em;
+    color: #4CAF50;
+}
+
+.comparison-analysis {
+    text-align: left;
+}
+
+.comparison-analysis h4 {
+    color: #4CAF50;
+    margin-bottom: 15px;
+}
+
+.analysis-points {
+    color: #e8eaed;
+    line-height: 1.5;
+}
+
+.compare-selection {
