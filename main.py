@@ -1,3 +1,4 @@
+
 import asyncio
 import json
 from datetime import datetime, timedelta
@@ -123,11 +124,20 @@ async def broadcast_data():
             "data": crypto_data,
             "timestamp": datetime.now().isoformat()
         }
+        
+        # S'assurer que le message est sérialisable en JSON
+        try:
+            json_message = json.dumps(message, default=str)
+        except Exception as e:
+            print(f"Erreur lors de la sérialisation JSON: {e}")
+            return
+            
         disconnected = []
         for connection in connections:
             try:
-                await connection.send_text(json.dumps(message))
-            except:
+                await connection.send_text(json_message)
+            except Exception as e:
+                print(f"Erreur lors de l'envoi WebSocket: {e}")
                 disconnected.append(connection)
 
         # Nettoyer les connexions fermées
@@ -140,9 +150,12 @@ async def crypto_updater():
     await fetch_historical_data()
 
     while True:
-        await fetch_crypto_data()
-        await broadcast_data()
-        await asyncio.sleep(1)  # Mise à jour chaque seconde
+        try:
+            await fetch_crypto_data()
+            await broadcast_data()
+        except Exception as e:
+            print(f"Erreur dans crypto_updater: {e}")
+        await asyncio.sleep(5)  # Mise à jour toutes les 5 secondes pour éviter de surcharger l'API
 
 @app.on_event("startup")
 async def startup_event():
@@ -167,13 +180,22 @@ async def websocket_endpoint(websocket: WebSocket):
                 "data": crypto_data,
                 "timestamp": datetime.now().isoformat()
             }
-            await websocket.send_text(json.dumps(message))
+            try:
+                json_message = json.dumps(message, default=str)
+                await websocket.send_text(json_message)
+            except Exception as e:
+                print(f"Erreur lors de l'envoi initial WebSocket: {e}")
 
         while True:
             # Garder la connexion ouverte
             await websocket.receive_text()
     except WebSocketDisconnect:
-        connections.remove(websocket)
+        if websocket in connections:
+            connections.remove(websocket)
+    except Exception as e:
+        print(f"Erreur WebSocket: {e}")
+        if websocket in connections:
+            connections.remove(websocket)
 
 @app.get("/api/crypto/{crypto_id}")
 async def get_crypto_data(crypto_id: str):

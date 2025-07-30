@@ -126,6 +126,7 @@ function connectWebSocket() {
             }
         } catch (error) {
             console.error('Erreur parsing message:', error);
+            console.error('Message reçu:', event.data);
         }
     };
 }
