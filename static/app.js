@@ -1,4 +1,3 @@
-
 // Variables globales
 let ws;
 let charts = {};
@@ -99,23 +98,23 @@ const chartConfig = {
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-    
+
     ws.onopen = function() {
         updateStatus('🟢 Connecté - Données en temps réel', 'connected');
         console.log('WebSocket connecté');
     };
-    
+
     ws.onclose = function() {
         updateStatus('🔴 Déconnecté - Tentative de reconnexion...', 'disconnected');
         console.log('WebSocket déconnecté, tentative de reconnexion...');
         setTimeout(connectWebSocket, 3000);
     };
-    
+
     ws.onerror = function(error) {
         console.error('Erreur WebSocket:', error);
         updateStatus('❌ Erreur de connexion', 'disconnected');
     };
-    
+
     ws.onmessage = function(event) {
         try {
             const message = JSON.parse(event.data);
@@ -135,12 +134,12 @@ function connectWebSocket() {
 async function refreshPrices() {
     const refreshBtn = document.getElementById('refresh-prices-btn');
     if (!refreshBtn) return;
-    
+
     // Animation du bouton
     refreshBtn.disabled = true;
     refreshBtn.style.transform = 'rotate(360deg)';
     refreshBtn.style.transition = 'transform 0.5s ease';
-    
+
     try {
         // Demander les données actualisées au serveur
         const response = await fetch('/api/refresh');
@@ -165,30 +164,30 @@ async function refreshPrices() {
 // ===== GESTION DES DONNÉES CRYPTO =====
 function updateCryptoData(data) {
     crypto_data = data;
-    
+
     const viewMode = document.getElementById('view-mode').value;
-    
+
     if (viewMode === 'grid') {
         updateCryptoGrid(data);
     } else if (viewMode === 'table') {
         updateCryptoTable(data);
     }
-    
+
     updateSearchResults();
 }
 
 function updateCryptoGrid(data) {
     const grid = document.getElementById('crypto-grid');
     if (!grid) return;
-    
+
     for (const [cryptoId, cryptoInfo] of Object.entries(data)) {
         let card = document.getElementById(`card-${cryptoId}`);
-        
+
         if (!card) {
             card = createCryptoCard(cryptoId, cryptoInfo);
             grid.appendChild(card);
         }
-        
+
         updateCryptoCard(cryptoId, cryptoInfo);
     }
 }
@@ -196,9 +195,9 @@ function updateCryptoGrid(data) {
 function updateCryptoTable(data) {
     const tableBody = document.getElementById('crypto-table-body');
     if (!tableBody) return;
-    
+
     tableBody.innerHTML = '';
-    
+
     Object.entries(data).forEach(([cryptoId, cryptoInfo]) => {
         const row = createTableRow(cryptoId, cryptoInfo);
         tableBody.appendChild(row);
@@ -209,7 +208,7 @@ function createTableRow(cryptoId, cryptoInfo) {
     const row = document.createElement('tr');
     const current = cryptoInfo.current || {};
     const isFavorite = favorites.includes(cryptoId);
-    
+
     row.innerHTML = `
         <td>
             <button class="favorite-btn ${isFavorite ? 'active' : ''}" data-crypto="${cryptoId}">
@@ -231,36 +230,36 @@ function createTableRow(cryptoId, cryptoInfo) {
             <button class="action-btn" onclick="createAlert('${cryptoId}')">🔔</button>
         </td>
     `;
-    
+
     return row;
 }
 
 // ===== PORTFOLIO =====
 function updatePortfolioValue() {
     if (!portfolio.length) return;
-    
+
     let totalValue = 0;
     let totalChange24h = 0;
     let totalPaid = 0;
-    
+
     portfolio.forEach(holding => {
         const cryptoData = crypto_data[holding.cryptoId];
         if (cryptoData && cryptoData.current) {
             const currentPrice = cryptoData.current.usd || 0;
             const holdingValue = holding.quantity * currentPrice;
             const paidValue = holding.quantity * holding.avgPrice;
-            
+
             totalValue += holdingValue;
             totalPaid += paidValue;
-            
+
             const change24h = (cryptoData.current.usd_24h_change || 0) / 100;
             totalChange24h += holdingValue * change24h;
         }
     });
-    
+
     const totalChange = totalValue - totalPaid;
     const totalChangePercent = totalPaid > 0 ? (totalChange / totalPaid) * 100 : 0;
-    
+
     updateElement('total-portfolio-value', `$${formatPrice(totalValue)}`);
     updateElement('portfolio-24h-change', `$${formatPrice(totalChange24h)} (${(totalChange24h/totalValue*100).toFixed(2)}%)`);
     updateElement('portfolio-total-change', `$${formatPrice(totalChange)} (${totalChangePercent.toFixed(2)}%)`);
@@ -273,7 +272,7 @@ function addTransaction(transaction) {
         id: Date.now(),
         timestamp: new Date().toISOString()
     });
-    
+
     updatePortfolioFromTransactions();
     saveToLocalStorage('transactions', transactions);
     updateTransactionCount();
@@ -282,7 +281,7 @@ function addTransaction(transaction) {
 
 function updatePortfolioFromTransactions() {
     const holdings = {};
-    
+
     transactions.forEach(tx => {
         if (!holdings[tx.crypto]) {
             holdings[tx.crypto] = {
@@ -292,7 +291,7 @@ function updatePortfolioFromTransactions() {
                 avgPrice: 0
             };
         }
-        
+
         if (tx.type === 'buy') {
             holdings[tx.crypto].quantity += tx.quantity;
             holdings[tx.crypto].totalPaid += tx.quantity * tx.price + tx.fees;
@@ -300,12 +299,12 @@ function updatePortfolioFromTransactions() {
             holdings[tx.crypto].quantity -= tx.quantity;
             holdings[tx.crypto].totalPaid -= tx.quantity * holdings[tx.crypto].avgPrice;
         }
-        
+
         if (holdings[tx.crypto].quantity > 0) {
             holdings[tx.crypto].avgPrice = holdings[tx.crypto].totalPaid / holdings[tx.crypto].quantity;
         }
     });
-    
+
     portfolio = Object.values(holdings).filter(h => h.quantity > 0);
     saveToLocalStorage('portfolio', portfolio);
 }
@@ -320,7 +319,7 @@ function createAlert(cryptoId, targetPrice, condition = 'above') {
         active: true,
         createdAt: new Date().toISOString()
     };
-    
+
     alerts.push(alert);
     saveToLocalStorage('alerts', alerts);
     showNotification('Alerte créée avec succès!', 'success');
@@ -331,16 +330,16 @@ function checkPriceAlerts() {
     alerts.filter(alert => alert.active).forEach(alert => {
         const cryptoData = crypto_data[alert.cryptoId];
         if (!cryptoData || !cryptoData.current) return;
-        
+
         const currentPrice = cryptoData.current.usd;
         let triggered = false;
-        
+
         if (alert.condition === 'above' && currentPrice >= alert.targetPrice) {
             triggered = true;
         } else if (alert.condition === 'below' && currentPrice <= alert.targetPrice) {
             triggered = true;
         }
-        
+
         if (triggered) {
             showNotification(
                 `🔔 Alerte: ${formatCryptoName(alert.cryptoId)} a ${alert.condition === 'above' ? 'dépassé' : 'chuté sous'} $${alert.targetPrice}!`,
@@ -379,7 +378,7 @@ async function fetchNews() {
                 source: "Regulatory Watch"
             }
         ];
-        
+
         newsData = sampleNews;
         updateNewsDisplay();
     } catch (error) {
@@ -390,7 +389,7 @@ async function fetchNews() {
 function updateNewsDisplay() {
     const newsList = document.getElementById('news-list');
     if (!newsList) return;
-    
+
     newsList.innerHTML = newsData.map(article => `
         <div class="news-item">
             <div class="news-header">
@@ -411,17 +410,17 @@ function calculatePnL() {
     const buyPrice = parseFloat(document.getElementById('buy-price').value);
     const sellPrice = parseFloat(document.getElementById('sell-price').value);
     const quantity = parseFloat(document.getElementById('quantity').value);
-    
+
     if (!buyPrice || !sellPrice || !quantity) {
         document.getElementById('pnl-result').innerHTML = 'Veuillez remplir tous les champs';
         return;
     }
-    
+
     const buyValue = buyPrice * quantity;
     const sellValue = sellPrice * quantity;
     const pnl = sellValue - buyValue;
     const pnlPercent = (pnl / buyValue) * 100;
-    
+
     const resultClass = pnl >= 0 ? 'positive' : 'negative';
     document.getElementById('pnl-result').innerHTML = `
         <div class="pnl-breakdown">
@@ -438,9 +437,9 @@ function convertCurrency() {
     const amount = parseFloat(document.getElementById('convert-amount').value);
     const from = document.getElementById('convert-from').value;
     const to = document.getElementById('convert-to').value;
-    
+
     if (!amount || !from || !to) return;
-    
+
     // Simulation de conversion (normalement via API)
     const rates = {
         'btc': crypto_data.bitcoin?.current?.usd || 50000,
@@ -448,190 +447,13 @@ function convertCurrency() {
         'usd': 1,
         'eur': 0.85
     };
-    
+
     const fromRate = rates[from] || 1;
     const toRate = rates[to] || 1;
     const result = (amount * fromRate) / toRate;
-    
+
     document.getElementById('conversion-result').textContent = 
         `${result.toFixed(8)} ${to.toUpperCase()}`;
-}
-
-// ===== GESTION DES WALLETS =====
-async function connectWallet(walletType, credentials) {
-    try {
-        const response = await fetch('/api/wallet/connect?user_id=' + (currentUser?.name || 'default_user'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                wallet_type: walletType,
-                ...credentials
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            connectedWallets.push(result.wallet_info);
-            saveToLocalStorage('connected-wallets', connectedWallets);
-            updateWalletsDisplay();
-            showNotification(`Wallet ${walletType} connecté avec succès!`, 'success');
-            return result;
-        } else {
-            showNotification(result.message, 'error');
-            return null;
-        }
-    } catch (error) {
-        console.error('Erreur connexion wallet:', error);
-        showNotification('Erreur lors de la connexion du wallet', 'error');
-        return null;
-    }
-}
-
-async function disconnectWallet(walletType) {
-    try {
-        const response = await fetch('/api/wallet/disconnect?user_id=' + (currentUser?.name || 'default_user'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                wallet_type: walletType
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            connectedWallets = connectedWallets.filter(w => w.type !== walletType);
-            saveToLocalStorage('connected-wallets', connectedWallets);
-            updateWalletsDisplay();
-            showNotification(`Wallet ${walletType} déconnecté`, 'info');
-        }
-    } catch (error) {
-        console.error('Erreur déconnexion wallet:', error);
-        showNotification('Erreur lors de la déconnexion', 'error');
-    }
-}
-
-async function loadUserWallets(userId) {
-    try {
-        const response = await fetch(`/api/wallet/list/${userId}`);
-        const result = await response.json();
-        
-        if (result.success) {
-            connectedWallets = result.wallets;
-            saveToLocalStorage('connected-wallets', connectedWallets);
-            updateWalletsDisplay();
-        }
-    } catch (error) {
-        console.error('Erreur chargement wallets:', error);
-    }
-}
-
-async function getWalletTransactions(walletType, limit = 50) {
-    try {
-        const userId = currentUser?.name || 'default_user';
-        const response = await fetch(`/api/wallet/transactions/${userId}/${walletType}?limit=${limit}`);
-        const result = await response.json();
-        
-        if (result.success) {
-            return result.transactions;
-        }
-        return [];
-    } catch (error) {
-        console.error('Erreur récupération transactions:', error);
-        return [];
-    }
-}
-
-function updateWalletsDisplay() {
-    const walletsList = document.getElementById('connected-wallets-list');
-    if (!walletsList) return;
-    
-    walletsList.innerHTML = connectedWallets.map(wallet => {
-        let balanceInfo = '';
-        if (wallet.type === 'binance') {
-            const mainBalances = wallet.balances?.filter(b => parseFloat(b.free) > 0).slice(0, 3) || [];
-            balanceInfo = mainBalances.map(b => `${b.asset}: ${parseFloat(b.free).toFixed(4)}`).join('<br>');
-        } else if (wallet.type === 'metamask') {
-            balanceInfo = `ETH: ${wallet.balance_eth?.toFixed(6) || '0'}`;
-        }
-        
-        return `
-            <div class="wallet-card">
-                <div class="wallet-header">
-                    <span class="wallet-name">${getWalletDisplayName(wallet.type)}</span>
-                    <span class="wallet-status ${wallet.status}">${wallet.status}</span>
-                </div>
-                <div class="wallet-balance">
-                    ${balanceInfo}
-                </div>
-                <div class="wallet-actions">
-                    <button class="btn-secondary" onclick="viewWalletDetails('${wallet.type}')">📊 Détails</button>
-                    <button class="btn-danger" onclick="disconnectWallet('${wallet.type}')">🔌 Déconnecter</button>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function getWalletDisplayName(walletType) {
-    const names = {
-        'binance': '🟡 Binance',
-        'metamask': '🦊 MetaMask',
-        'trust_wallet': '💙 Trust Wallet',
-        'cake_wallet': '🍰 Cake Wallet',
-        'coinbase': '🟦 Coinbase'
-    };
-    return names[walletType] || walletType;
-}
-
-async function viewWalletDetails(walletType) {
-    const wallet = connectedWallets.find(w => w.type === walletType);
-    if (!wallet) return;
-    
-    // Charger les transactions récentes
-    const transactions = await getWalletTransactions(walletType);
-    
-    // Afficher dans une modal
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.display = 'block';
-    modal.innerHTML = `
-        <div class="modal-content large-modal">
-            <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
-            <h2>${getWalletDisplayName(walletType)} - Détails</h2>
-            <div class="wallet-details">
-                <div class="wallet-overview">
-                    <h3>Informations générales</h3>
-                    <p><strong>Status:</strong> ${wallet.status}</p>
-                    <p><strong>Dernière mise à jour:</strong> ${new Date(wallet.last_update).toLocaleString()}</p>
-                    ${wallet.address ? `<p><strong>Adresse:</strong> ${wallet.address}</p>` : ''}
-                </div>
-                <div class="wallet-transactions">
-                    <h3>Transactions récentes</h3>
-                    <div class="transactions-list">
-                        ${transactions.length > 0 ? 
-                            transactions.slice(0, 10).map(tx => `
-                                <div class="transaction-item">
-                                    <span>${tx.symbol || 'N/A'}</span>
-                                    <span>${tx.side || tx.type || 'N/A'}</span>
-                                    <span>${tx.quantity || tx.value || 'N/A'}</span>
-                                    <span>${new Date(tx.time || tx.timestamp).toLocaleDateString()}</span>
-                                </div>
-                            `).join('') : 
-                            '<p>Aucune transaction trouvée</p>'
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
 }
 
 // ===== GESTION DES FAVORIS =====
@@ -642,7 +464,7 @@ function toggleFavorite(cryptoId) {
     } else {
         favorites.push(cryptoId);
     }
-    
+
     saveToLocalStorage('crypto-favorites', favorites);
     updateFavoriteButtons();
     showNotification(
@@ -664,13 +486,13 @@ function updateFavoriteButtons() {
 function setupHamburgerMenu() {
     const menuToggle = document.getElementById('menu-toggle');
     const dropdownMenu = document.getElementById('dropdown-menu');
-    
+
     menuToggle.addEventListener('click', (e) => {
         e.stopPropagation();
         menuToggle.classList.toggle('active');
         dropdownMenu.classList.toggle('active');
     });
-    
+
     // Fermer le menu en cliquant ailleurs
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.menu-container')) {
@@ -678,7 +500,7 @@ function setupHamburgerMenu() {
             dropdownMenu.classList.remove('active');
         }
     });
-    
+
     // Fermer le menu après clic sur un élément
     dropdownMenu.addEventListener('click', (e) => {
         if (e.target.classList.contains('dropdown-item') && !e.target.matches('select')) {
@@ -694,20 +516,20 @@ function setupHamburgerMenu() {
 function setupSearch() {
     const searchInput = document.getElementById('crypto-search');
     const searchResults = document.getElementById('search-results');
-    
+
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase().trim();
-        
+
         if (query.length < 2) {
             searchResults.style.display = 'none';
             return;
         }
-        
+
         const matches = Object.keys(crypto_data).filter(cryptoId => 
             formatCryptoName(cryptoId).toLowerCase().includes(query) ||
             cryptoId.toLowerCase().includes(query)
         ).slice(0, 5);
-        
+
         if (matches.length > 0) {
             searchResults.innerHTML = matches.map(cryptoId => `
                 <div class="search-result-item" data-crypto="${cryptoId}">
@@ -719,7 +541,7 @@ function setupSearch() {
             searchResults.style.display = 'none';
         }
     });
-    
+
     searchResults.addEventListener('click', (e) => {
         if (e.target.classList.contains('search-result-item')) {
             const cryptoId = e.target.dataset.crypto;
@@ -741,22 +563,22 @@ function updateMarketStats() {
     let totalMarketCap = 0;
     let totalVolume = 0;
     let btcDominance = 0;
-    
+
     Object.values(crypto_data).forEach(crypto => {
         if (crypto.stats && crypto.current) {
             totalMarketCap += crypto.stats.market_cap || 0;
             totalVolume += crypto.current.usd_24h_vol || 0;
         }
     });
-    
+
     if (crypto_data.bitcoin && crypto_data.bitcoin.stats) {
         btcDominance = ((crypto_data.bitcoin.stats.market_cap || 0) / totalMarketCap) * 100;
     }
-    
+
     updateElement('total-market-cap', `$${formatPrice(totalMarketCap)}`);
     updateElement('total-volume', `$${formatPrice(totalVolume)}`);
     updateElement('btc-dominance', `${btcDominance.toFixed(1)}%`);
-    
+
     // Fear & Greed Index (simulation)
     const fearGreedValue = Math.floor(Math.random() * 100);
     updateElement('fear-greed', fearGreedValue);
@@ -766,7 +588,7 @@ function updateMarketStats() {
 function updateFearGreedIndicator(value) {
     const indicator = document.getElementById('fear-greed-indicator');
     if (!indicator) return;
-    
+
     let color, text;
     if (value <= 25) {
         color = '#f44336';
@@ -784,7 +606,7 @@ function updateFearGreedIndicator(value) {
         color = '#4caf50';
         text = 'Cupidité Extrême';
     }
-    
+
     indicator.style.background = color;
     indicator.textContent = text;
 }
@@ -793,7 +615,7 @@ function updateFearGreedIndicator(value) {
 function switchView(mode) {
     const grid = document.getElementById('crypto-grid');
     const table = document.getElementById('crypto-table');
-    
+
     if (mode === 'table') {
         grid.style.display = 'none';
         table.style.display = 'block';
@@ -812,7 +634,7 @@ function switchSettingsTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-    
+
     document.getElementById(`${tabName}-tab`).classList.add('active');
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
 }
@@ -829,10 +651,10 @@ function saveSettings() {
     userSettings.animationsEnabled = document.getElementById('animations-enabled').checked;
     userSettings.saveLocally = document.getElementById('save-locally').checked;
     userSettings.defaultExchange = document.getElementById('default-exchange').value;
-    
+
     saveToLocalStorage('user-settings', userSettings);
     applyTheme(userSettings.theme);
-    
+
     closeModal('settings-modal');
     showNotification('Paramètres sauvegardés !', 'success');
 }
@@ -882,7 +704,7 @@ function formatTimeAgo(dateString) {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-    
+
     if (diffInSeconds < 60) return 'À l\'instant';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
@@ -904,27 +726,27 @@ function showNotification(message, type = 'info') {
     const container = document.getElementById('notifications-container');
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    
+
     const icons = {
         success: '✅',
         error: '❌',
         warning: '⚠️',
         info: 'ℹ️'
     };
-    
+
     notification.innerHTML = `
         <span class="notification-icon">${icons[type] || icons.info}</span>
         <span class="notification-message">${message}</span>
         <button class="notification-close">&times;</button>
     `;
-    
+
     container.appendChild(notification);
-    
+
     setTimeout(() => {
         notification.classList.add('fade-out');
         setTimeout(() => notification.remove(), 300);
     }, 5000);
-    
+
     notification.querySelector('.notification-close').addEventListener('click', () => {
         notification.remove();
     });
@@ -959,9 +781,9 @@ function createCryptoCard(cryptoId, cryptoInfo) {
     const card = document.createElement('div');
     card.className = 'crypto-card';
     card.id = `card-${cryptoId}`;
-    
+
     const isFavorite = favorites.includes(cryptoId);
-    
+
     card.innerHTML = `
         <div class="crypto-header">
             <div class="crypto-name" id="name-${cryptoId}">${formatCryptoName(cryptoId)}</div>
@@ -1011,7 +833,7 @@ function createCryptoCard(cryptoId, cryptoInfo) {
             <button class="action-btn" onclick="openAlertModal('${cryptoId}')">🔔 Alerte</button>
         </div>
     `;
-    
+
     // Ajouter les événements
     setTimeout(() => {
         const ctx = document.getElementById(`chart-${cryptoId}`);
@@ -1024,7 +846,7 @@ function createCryptoCard(cryptoId, cryptoInfo) {
                 currentPeriod: 'realtime'
             };
         }
-        
+
         // Gestionnaires d'événements
         const tabBtns = card.querySelectorAll('.tab-btn');
         tabBtns.forEach(btn => {
@@ -1032,18 +854,18 @@ function createCryptoCard(cryptoId, cryptoInfo) {
                 const period = btn.dataset.period;
                 const crypto = btn.dataset.crypto;
                 switchChartPeriod(crypto, period);
-                
+
                 tabBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             });
         });
-        
+
         const favoriteBtn = card.querySelector('.favorite-btn');
         favoriteBtn.addEventListener('click', () => {
             toggleFavorite(cryptoId);
         });
     }, 100);
-    
+
     return card;
 }
 
@@ -1051,368 +873,24 @@ function updateCryptoCard(cryptoId, cryptoInfo) {
     const current = cryptoInfo.current;
     const stats = cryptoInfo.stats || {};
     if (!current) return;
-    
+
     updateElement(`price-${cryptoId}`, `$${formatPrice(current.usd)}`);
-    
+
     const change24h = current.usd_24h_change || 0;
     const changeElement = document.getElementById(`change-${cryptoId}`);
     if (changeElement) {
         changeElement.textContent = `${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%`;
         changeElement.className = `change ${change24h >= 0 ? 'positive' : 'negative'}`;
     }
-    
+
     updateStatElement(`change-24h-${cryptoId}`, change24h, true);
     updateStatElement(`change-year-${cryptoId}`, stats.year_change, true);
     updateStatElement(`year-high-${cryptoId}`, stats.year_high, false, true);
     updateStatElement(`year-low-${cryptoId}`, stats.year_low, false, true);
     updateStatElement(`volume-${cryptoId}`, current.usd_24h_vol, false, true);
     updateStatElement(`market-cap-${cryptoId}`, stats.market_cap, false, true);
-    
+
     updateChart(cryptoId, cryptoInfo);
 }
 
-function updateStatElement(elementId, value, isPercentage = false, isPrice = false) {
-    const element = document.getElementById(elementId);
-    if (!element || value === undefined || value === null) return;
-    
-    if (isPercentage) {
-        element.textContent = `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-        element.className = `stat-value ${value >= 0 ? 'positive' : 'negative'}`;
-    } else if (isPrice) {
-        element.textContent = `$${formatPrice(value)}`;
-    } else {
-        element.textContent = value.toString();
-    }
-}
-
-function switchChartPeriod(cryptoId, period) {
-    const chartObj = charts[cryptoId];
-    if (!chartObj) return;
-    
-    chartObj.currentPeriod = period;
-    updateChart(cryptoId, crypto_data[cryptoId] || {});
-}
-
-function updateChart(cryptoId, cryptoInfo) {
-    const chartObj = charts[cryptoId];
-    if (!chartObj) return;
-    
-    const chart = chartObj.chart;
-    const period = chartObj.currentPeriod || 'realtime';
-    
-    let prices, timestamps;
-    
-    if (period === 'historical') {
-        prices = cryptoInfo.historical_prices || [];
-        timestamps = cryptoInfo.historical_timestamps || [];
-    } else {
-        prices = cryptoInfo.prices || [];
-        timestamps = cryptoInfo.timestamps || [];
-    }
-    
-    if (prices.length === 0) return;
-    
-    const maxPoints = period === 'historical' ? 100 : 50;
-    const step = Math.max(1, Math.floor(prices.length / maxPoints));
-    
-    const filteredPrices = prices.filter((_, index) => index % step === 0);
-    const filteredTimestamps = timestamps.filter((_, index) => index % step === 0);
-    
-    chart.data.labels = filteredTimestamps.map(ts => {
-        const date = new Date(ts);
-        if (period === 'historical') {
-            return date.toLocaleDateString('fr-FR', {
-                month: 'short',
-                day: 'numeric'
-            });
-        } else {
-            return date.toLocaleTimeString('fr-FR', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-    });
-    
-    chart.data.datasets[0].data = filteredPrices;
-    
-    const isUpTrend = filteredPrices.length > 1 && 
-                      filteredPrices[filteredPrices.length - 1] > filteredPrices[0];
-    
-    chart.data.datasets[0].borderColor = isUpTrend ? '#4CAF50' : '#f44336';
-    chart.data.datasets[0].backgroundColor = isUpTrend ? 
-        'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)';
-    
-    chart.update('none');
-}
-
-// Fonction pour ouvrir la modal de connexion wallet
-window.openWalletConnectionModal = function(walletType) {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.display = 'block';
-    
-    let formContent = '';
-    
-    if (walletType === 'binance') {
-        formContent = `
-            <div class="form-group">
-                <label for="binance-api-key">Clé API Binance:</label>
-                <input type="text" id="binance-api-key" placeholder="Votre clé API Binance" required>
-            </div>
-            <div class="form-group">
-                <label for="binance-secret-key">Clé Secrète Binance:</label>
-                <input type="password" id="binance-secret-key" placeholder="Votre clé secrète Binance" required>
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="binance-testnet"> Utiliser Testnet
-                </label>
-            </div>
-        `;
-    } else if (walletType === 'metamask') {
-        formContent = `
-            <div class="form-group">
-                <label for="wallet-address">Adresse du Wallet:</label>
-                <input type="text" id="wallet-address" placeholder="0x..." required>
-            </div>
-            <div class="form-group">
-                <label for="infura-project-id">Project ID Infura:</label>
-                <input type="text" id="infura-project-id" placeholder="Votre Project ID Infura" required>
-            </div>
-        `;
-    } else if (walletType === 'cake_wallet') {
-        formContent = `
-            <div class="form-group">
-                <label for="cake-api-key">Clé API Cake Wallet:</label>
-                <input type="text" id="cake-api-key" placeholder="Votre clé API Cake Wallet" required>
-            </div>
-        `;
-    }
-    
-    modal.innerHTML = `
-        <div class="modal-content">
-            <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
-            <h2>🔐 Connecter ${getWalletDisplayName(walletType)}</h2>
-            <form id="wallet-connection-form">
-                ${formContent}
-                <div class="wallet-security-notice">
-                    <p>🔒 <strong>Sécurité:</strong> Vos clés API sont stockées de manière sécurisée et chiffrée. Nous recommandons d'utiliser des permissions lecture seule.</p>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn-primary">🔌 Connecter</button>
-                    <button type="button" class="btn-secondary" onclick="this.closest('.modal').remove()">Annuler</button>
-                </div>
-            </form>
-        </div>
-    `;
-    
-    modal.querySelector('#wallet-connection-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        let credentials = {};
-        
-        if (walletType === 'binance') {
-            credentials = {
-                api_key: document.getElementById('binance-api-key').value,
-                secret_key: document.getElementById('binance-secret-key').value,
-                testnet: document.getElementById('binance-testnet').checked
-            };
-        } else if (walletType === 'metamask') {
-            credentials = {
-                wallet_address: document.getElementById('wallet-address').value,
-                infura_project_id: document.getElementById('infura-project-id').value
-            };
-        } else if (walletType === 'cake_wallet') {
-            credentials = {
-                api_key: document.getElementById('cake-api-key').value
-            };
-        }
-        
-        const result = await connectWallet(walletType, credentials);
-        if (result) {
-            modal.remove();
-        }
-    });
-    
-    document.body.appendChild(modal);
-};
-
-// ===== INITIALISATION =====
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard crypto Pro initialisé');
-    
-    // Charger les données sauvegardées
-    portfolio = JSON.parse(localStorage.getItem('portfolio')) || [];
-    transactions = JSON.parse(localStorage.getItem('transactions')) || [];
-    alerts = JSON.parse(localStorage.getItem('alerts')) || [];
-    
-    // Initialiser les composants
-    connectWebSocket();
-    setupSearch();
-    fetchNews();
-    
-    // Gestionnaires d'événements pour les boutons du menu
-    document.getElementById('login-btn').addEventListener('click', () => {
-        if (currentUser) {
-            openModal('profile-modal');
-        } else {
-            openModal('login-modal');
-        }
-    });
-    
-    document.getElementById('profile-btn').addEventListener('click', () => openModal('profile-modal'));
-    document.getElementById('settings-btn').addEventListener('click', () => {
-        openModal('settings-modal');
-        // Charger les paramètres actuels
-        document.getElementById('theme-select').value = userSettings.theme;
-        document.getElementById('currency-select').value = userSettings.currency;
-        document.getElementById('auto-refresh').checked = userSettings.autoRefresh;
-        document.getElementById('refresh-interval').value = userSettings.refreshInterval;
-        document.getElementById('price-alerts').checked = userSettings.priceAlerts;
-        document.getElementById('market-alerts').checked = userSettings.marketAlerts;
-        document.getElementById('news-notifications').checked = userSettings.newsNotifications;
-        document.getElementById('email-notifications').checked = userSettings.emailNotifications;
-        document.getElementById('animations-enabled').checked = userSettings.animationsEnabled;
-        document.getElementById('save-locally').checked = userSettings.saveLocally;
-        document.getElementById('default-exchange').value = userSettings.defaultExchange;
-    });
-    
-    document.getElementById('portfolio-btn').addEventListener('click', () => openModal('portfolio-modal'));
-    document.getElementById('alerts-btn').addEventListener('click', () => openModal('alerts-modal'));
-    document.getElementById('news-btn').addEventListener('click', () => openModal('news-modal'));
-    document.getElementById('tools-btn').addEventListener('click', () => openModal('tools-modal'));
-    
-    // Gestionnaires pour fermer les modales
-    document.querySelectorAll('.close').forEach(closeBtn => {
-        closeBtn.addEventListener('click', (e) => {
-            const modal = e.target.closest('.modal');
-            if (modal) modal.style.display = 'none';
-        });
-    });
-    
-    // Fermer les modales en cliquant à l'extérieur
-    window.addEventListener('click', (event) => {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-        }
-    });
-    
-    // Changement de vue
-    document.getElementById('view-mode').addEventListener('change', (e) => {
-        switchView(e.target.value);
-    });
-    
-    // Bouton de rafraîchissement manuel
-    document.getElementById('refresh-prices-btn').addEventListener('click', refreshPrices);
-    
-    // Menu hamburger
-    setupHamburgerMenu();
-    
-    // Onglets des paramètres
-    document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            switchSettingsTab(btn.dataset.tab);
-        });
-    });
-    
-    // Formulaires
-    document.getElementById('login-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        handleLogin(formData.get('username'), formData.get('password'));
-    });
-    
-    document.getElementById('transaction-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        addTransaction({
-            type: formData.get('transaction-type'),
-            crypto: formData.get('transaction-crypto'),
-            quantity: parseFloat(formData.get('transaction-quantity')),
-            price: parseFloat(formData.get('transaction-price')),
-            fees: parseFloat(formData.get('transaction-fees')) || 0,
-            date: formData.get('transaction-date'),
-            notes: formData.get('transaction-notes')
-        });
-        closeModal('transaction-modal');
-        e.target.reset();
-    });
-    
-    // Calculatrice P&L
-    document.getElementById('calculate-pnl').addEventListener('click', calculatePnL);
-    
-    // Convertisseur
-    ['convert-amount', 'convert-from', 'convert-to'].forEach(id => {
-        document.getElementById(id).addEventListener('change', convertCurrency);
-    });
-    
-    // Autres gestionnaires
-    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
-    document.getElementById('add-transaction-btn').addEventListener('click', () => {
-        openModal('transaction-modal');
-        document.getElementById('transaction-date').value = new Date().toISOString().slice(0, 16);
-    });
-    
-    // Initialiser l'interface
-    applyTheme(userSettings.theme);
-    updateTransactionCount();
-    updatePortfolioValue();
-});
-
-// Gestionnaire pour la visibilité de la page
-document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible' && ws.readyState !== WebSocket.OPEN) {
-        connectWebSocket();
-    }
-});
-
-// Fonctions globales pour les événements inline
-window.addToPortfolio = function(cryptoId) {
-    openModal('transaction-modal');
-    document.getElementById('transaction-crypto').value = cryptoId;
-    document.getElementById('transaction-type').value = 'buy';
-    document.getElementById('transaction-date').value = new Date().toISOString().slice(0, 16);
-};
-
-window.openAlertModal = function(cryptoId) {
-    const targetPrice = prompt(`Créer une alerte pour ${formatCryptoName(cryptoId)}.\nPrix cible ($):`);
-    if (targetPrice && !isNaN(targetPrice)) {
-        const condition = confirm('Alerte quand le prix DÉPASSE cette valeur?\n(Annuler = alerte quand le prix DESCEND sous cette valeur)') ? 'above' : 'below';
-        createAlert(cryptoId, parseFloat(targetPrice), condition);
-    }
-};
-
-window.handleLogin = function(username, password) {
-    if (username && password) {
-        currentUser = {
-            name: username,
-            email: `${username}@crypto-trader.com`,
-            memberSince: 'Janvier 2024',
-            bio: 'Passionné de crypto-monnaies'
-        };
-        
-        saveToLocalStorage('current-user', currentUser);
-        updateUserInterface();
-        closeModal('login-modal');
-        showNotification('Connexion réussie !', 'success');
-    } else {
-        showNotification('Veuillez remplir tous les champs', 'error');
-    }
-};
-
-window.updateUserInterface = function() {
-    const loginBtn = document.getElementById('login-btn');
-    const profileBtn = document.getElementById('profile-btn');
-    
-    if (currentUser) {
-        loginBtn.textContent = '👤 ' + currentUser.name;
-        profileBtn.style.display = 'block';
-        
-        updateElement('profile-name', currentUser.name);
-        updateElement('profile-email', currentUser.email);
-        updateElement('profile-member-since', 'Membre depuis: ' + currentUser.memberSince);
-    } else {
-        loginBtn.textContent = '🔐 Connexion';
-        profileBtn.style.display = 'none';
-    }
-};
+function updateStatElement
