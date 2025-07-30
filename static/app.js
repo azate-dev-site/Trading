@@ -132,8 +132,16 @@ function connectWebSocket() {
 
 // ===== FONCTIONS BARRE D'OUTILS =====
 function showFavorites() {
+    console.log('showFavorites appelée, favoris:', favorites);
+    
     const grid = document.getElementById('crypto-grid');
+    if (!grid) {
+        showNotification('Grille des cryptos non trouvée', 'error');
+        return;
+    }
+    
     const cards = grid.querySelectorAll('.crypto-card');
+    console.log('Cartes trouvées:', cards.length);
     
     // Masquer toutes les cartes d'abord
     cards.forEach(card => {
@@ -142,7 +150,7 @@ function showFavorites() {
     
     // Afficher seulement les favoris
     if (favorites.length === 0) {
-        showNotification('Aucun favori trouvé. Ajoutez des cryptos à vos favoris !', 'info');
+        showNotification('Aucun favori trouvé. Cliquez sur ⭐ pour ajouter des cryptos à vos favoris !', 'info');
         cards.forEach(card => card.style.display = 'block');
         return;
     }
@@ -162,10 +170,16 @@ function showFavorites() {
     } else {
         showNotification(`${favoritesFound} crypto(s) favorite(s) affichée(s)`, 'success');
         
+        // Supprimer l'ancien bouton reset s'il existe
+        const existingResetBtn = document.querySelector('.favorites-reset-btn');
+        if (existingResetBtn) {
+            existingResetBtn.remove();
+        }
+        
         // Bouton pour revenir à la vue complète
         const resetBtn = document.createElement('button');
         resetBtn.textContent = '↩️ Voir toutes les cryptos';
-        resetBtn.className = 'tool-btn';
+        resetBtn.className = 'tool-btn favorites-reset-btn';
         resetBtn.style.position = 'fixed';
         resetBtn.style.top = '120px';
         resetBtn.style.right = '20px';
@@ -180,35 +194,45 @@ function showFavorites() {
 }
 
 function exportData() {
-    const dataToExport = {
-        portfolio: portfolio,
-        transactions: transactions,
-        alerts: alerts,
-        favorites: favorites,
-        settings: userSettings,
-        exportDate: new Date().toISOString(),
-        cryptoData: Object.keys(crypto_data).reduce((acc, key) => {
-            acc[key] = {
-                current: crypto_data[key].current,
-                stats: crypto_data[key].stats
-            };
-            return acc;
-        }, {})
-    };
+    console.log('exportData appelée');
     
-    const dataStr = JSON.stringify(dataToExport, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `crypto-dashboard-export-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    showNotification('Données exportées avec succès !', 'success');
+    try {
+        const dataToExport = {
+            portfolio: portfolio || [],
+            transactions: transactions || [],
+            alerts: alerts || [],
+            favorites: favorites || [],
+            settings: userSettings || {},
+            exportDate: new Date().toISOString(),
+            cryptoData: Object.keys(crypto_data || {}).reduce((acc, key) => {
+                if (crypto_data[key]) {
+                    acc[key] = {
+                        current: crypto_data[key].current || {},
+                        stats: crypto_data[key].stats || {}
+                    };
+                }
+                return acc;
+            }, {})
+        };
+        
+        const dataStr = JSON.stringify(dataToExport, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(dataBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `crypto-dashboard-export-${new Date().toISOString().slice(0, 10)}.json`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showNotification('📊 Données exportées avec succès !', 'success');
+    } catch (error) {
+        console.error('Erreur lors de l\'export:', error);
+        showNotification('❌ Erreur lors de l\'export des données', 'error');
+    }
 }
 
 // ===== RAFRAÎCHISSEMENT MANUEL =====
@@ -1263,10 +1287,25 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('refresh-prices-btn').addEventListener('click', refreshPrices);
     
     // Boutons de la barre d'outils
-    document.getElementById('favorites-btn').addEventListener('click', showFavorites);
-    document.getElementById('compare-btn').addEventListener('click', () => openModal('compare-modal'));
-    document.getElementById('calculator-btn').addEventListener('click', () => openModal('tools-modal'));
-    document.getElementById('export-btn').addEventListener('click', exportData);
+    const favoritesBtn = document.getElementById('favorites-btn');
+    if (favoritesBtn) {
+        favoritesBtn.addEventListener('click', showFavorites);
+    }
+    
+    const compareBtn = document.getElementById('compare-btn');
+    if (compareBtn) {
+        compareBtn.addEventListener('click', () => openModal('compare-modal'));
+    }
+    
+    const calculatorBtn = document.getElementById('calculator-btn');
+    if (calculatorBtn) {
+        calculatorBtn.addEventListener('click', () => openModal('tools-modal'));
+    }
+    
+    const exportBtn = document.getElementById('export-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportData);
+    }
     
     // Onglets des paramètres
     document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => {
@@ -1314,7 +1353,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Comparaison de cryptos
-    document.getElementById('start-compare').addEventListener('click', compareCryptos);
+    const startCompareBtn = document.getElementById('start-compare');
+    if (startCompareBtn) {
+        startCompareBtn.addEventListener('click', compareCryptos);
+    }
+    
+    // Test des boutons de la barre d'outils - Debug
+    console.log('Vérification des boutons:');
+    console.log('Favoris:', document.getElementById('favorites-btn'));
+    console.log('Comparer:', document.getElementById('compare-btn'));
+    console.log('Calculatrice:', document.getElementById('calculator-btn'));
+    console.log('Exporter:', document.getElementById('export-btn'));
     
     // Initialiser les sélecteurs de comparaison
     populateCompareSelectors();
@@ -1323,6 +1372,29 @@ document.addEventListener('DOMContentLoaded', function() {
     applyTheme(userSettings.theme);
     updateTransactionCount();
     updatePortfolioValue();
+    
+    // Gestionnaires d'événements de secours pour les boutons problématiques
+    setTimeout(() => {
+        const buttons = [
+            { id: 'favorites-btn', action: showFavorites, name: 'Favoris' },
+            { id: 'compare-btn', action: () => openModal('compare-modal'), name: 'Comparer' },
+            { id: 'calculator-btn', action: () => openModal('tools-modal'), name: 'Calculatrice' },
+            { id: 'export-btn', action: exportData, name: 'Exporter' }
+        ];
+        
+        buttons.forEach(btn => {
+            const element = document.getElementById(btn.id);
+            if (element && !element.hasAttribute('data-listener-added')) {
+                console.log(`Ajout du gestionnaire pour ${btn.name}`);
+                element.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log(`Bouton ${btn.name} cliqué`);
+                    btn.action();
+                });
+                element.setAttribute('data-listener-added', 'true');
+            }
+        });
+    }, 1000);
 });
 
 // Gestionnaire pour la visibilité de la page
