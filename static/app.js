@@ -1,3 +1,4 @@
+
 // Variables globales
 let ws;
 let charts = {};
@@ -25,7 +26,7 @@ let crypto_data = {};
 let newsData = [];
 let marketStats = {};
 
-// Configuration des graphiques améliorée
+// Configuration des graphiques
 const chartConfig = {
     type: 'line',
     data: {
@@ -34,20 +35,12 @@ const chartConfig = {
             label: 'Prix USD',
             data: [],
             borderColor: '#4CAF50',
-            backgroundColor: createGradient,
+            backgroundColor: 'rgba(76, 175, 80, 0.1)',
             tension: 0.4,
             fill: true,
             pointRadius: 0,
-            pointHoverRadius: 8,
-            pointBackgroundColor: '#4CAF50',
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            pointHoverBorderWidth: 3,
-            borderWidth: 3,
-            shadowOffsetX: 0,
-            shadowOffsetY: 2,
-            shadowBlur: 10,
-            shadowColor: 'rgba(76, 175, 80, 0.3)'
+            pointHoverRadius: 5,
+            borderWidth: 2
         }]
     },
     options: {
@@ -57,229 +50,111 @@ const chartConfig = {
             intersect: false,
             mode: 'index'
         },
-        elements: {
-            point: {
-                hoverRadius: 8,
-                hoverBorderWidth: 3
-            },
-            line: {
-                borderJoinStyle: 'round',
-                borderCapStyle: 'round'
-            }
-        },
         plugins: {
             legend: {
                 display: false
             },
             tooltip: {
-                enabled: true,
-                backgroundColor: 'rgba(22, 27, 34, 0.95)',
-                titleColor: '#f0f6ff',
-                bodyColor: '#e8eaed',
+                backgroundColor: 'rgba(45, 45, 45, 0.9)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
                 borderColor: '#4CAF50',
-                borderWidth: 2,
-                cornerRadius: 12,
-                displayColors: false,
-                titleFont: {
-                    size: 14,
-                    weight: 'bold'
-                },
-                bodyFont: {
-                    size: 13,
-                    weight: '500'
-                },
-                padding: 12,
-                titleSpacing: 8,
-                bodySpacing: 6,
-                caretSize: 8,
-                caretPadding: 10,
-                usePointStyle: true,
-                callbacks: {
-                    title: function(tooltipItems) {
-                        return 'Prix: ' + tooltipItems[0].label;
-                    },
-                    label: function(context) {
-                        return '$' + parseFloat(context.parsed.y).toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 6
-                        });
-                    },
-                    afterLabel: function(context) {
-                        const data = context.dataset.data;
-                        const currentIndex = context.dataIndex;
-                        if (currentIndex > 0) {
-                            const prevValue = data[currentIndex - 1];
-                            const currentValue = data[currentIndex];
-                            const change = ((currentValue - prevValue) / prevValue * 100);
-                            return change >= 0 ? 
-                                `📈 +${change.toFixed(2)}%` : 
-                                `📉 ${change.toFixed(2)}%`;
-                        }
-                        return '';
-                    }
-                }
+                borderWidth: 1,
+                cornerRadius: 8,
+                displayColors: false
             }
         },
         scales: {
             x: {
-                display: true,
+                display: false,
                 grid: {
-                    display: true,
-                    color: 'rgba(255, 255, 255, 0.05)',
-                    lineWidth: 1,
-                    drawBorder: false
-                },
-                ticks: {
-                    display: false
-                },
-                border: {
                     display: false
                 }
             },
             y: {
-                display: true,
-                position: 'right',
                 grid: {
-                    color: 'rgba(255, 255, 255, 0.08)',
-                    lineWidth: 1,
-                    drawBorder: false
+                    color: 'rgba(255, 255, 255, 0.1)',
+                    lineWidth: 1
                 },
                 ticks: {
-                    color: 'rgba(255, 255, 255, 0.7)',
+                    color: '#fff',
                     font: {
-                        size: 11,
-                        weight: '500'
+                        size: 12
                     },
-                    padding: 10,
-                    maxTicksLimit: 6,
                     callback: function(value) {
-                        if (value >= 1000000) {
-                            return '$' + (value / 1000000).toFixed(1) + 'M';
-                        } else if (value >= 1000) {
-                            return '$' + (value / 1000).toFixed(1) + 'K';
-                        } else if (value >= 1) {
-                            return '$' + value.toFixed(0);
-                        } else {
-                            return '$' + value.toFixed(4);
-                        }
+                        return '$' + value.toLocaleString();
                     }
-                },
-                border: {
-                    display: false
                 }
             }
         },
         animation: {
-            duration: userSettings.animationsEnabled ? 1200 : 0,
-            easing: 'easeInOutCubic',
-            delay: (context) => {
-                let delay = 0;
-                if (context.type === 'data' && context.mode === 'default') {
-                    delay = context.dataIndex * 30;
-                }
-                return delay;
-            }
-        },
-        transitions: {
-            active: {
-                animation: {
-                    duration: 400
-                }
-            }
+            duration: userSettings.animationsEnabled ? 750 : 0,
+            easing: 'easeInOutQuart'
         }
     }
 };
-
-// Fonction pour créer des dégradés dynamiques
-function createGradient(ctx, chartArea, isUpTrend = true) {
-    if (!chartArea) {
-        return null;
-    }
-
-    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-
-    if (isUpTrend) {
-        gradient.addColorStop(0, 'rgba(76, 175, 80, 0.05)');
-        gradient.addColorStop(0.5, 'rgba(76, 175, 80, 0.15)');
-        gradient.addColorStop(1, 'rgba(76, 175, 80, 0.3)');
-    } else {
-        gradient.addColorStop(0, 'rgba(244, 67, 54, 0.05)');
-        gradient.addColorStop(0.5, 'rgba(244, 67, 54, 0.15)');
-        gradient.addColorStop(1, 'rgba(244, 67, 54, 0.3)');
-    }
-
-    return gradient;
-}
 
 // ===== GESTION DES WEBSOCKETS =====
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-
+    
     ws.onopen = function() {
         updateStatus('🟢 Connecté - Données en temps réel', 'connected');
         console.log('WebSocket connecté');
     };
-
+    
     ws.onclose = function() {
         updateStatus('🔴 Déconnecté - Tentative de reconnexion...', 'disconnected');
         console.log('WebSocket déconnecté, tentative de reconnexion...');
         setTimeout(connectWebSocket, 3000);
     };
-
+    
     ws.onerror = function(error) {
         console.error('Erreur WebSocket:', error);
         updateStatus('❌ Erreur de connexion', 'disconnected');
     };
-
+    
     ws.onmessage = function(event) {
         try {
-            if (!event.data || event.data.trim() === '') {
-                console.warn('Message WebSocket vide reçu');
-                return;
-            }
-
             const message = JSON.parse(event.data);
-            if (message && message.type === 'crypto_update' && message.data) {
+            if (message.type === 'crypto_update') {
                 updateCryptoData(message.data);
                 updateMarketStats();
                 checkPriceAlerts();
                 updatePortfolioValue();
-            } else {
-                console.warn('Message WebSocket mal formaté:', message);
             }
         } catch (error) {
             console.error('Erreur parsing message:', error);
-            console.error('Message reçu:', event.data);
-            console.error('Type du message:', typeof event.data);
         }
     };
+}
 
 // ===== FONCTIONS BARRE D'OUTILS =====
 function showFavorites() {
     console.log('showFavorites appelée, favoris:', favorites);
-
+    
     const grid = document.getElementById('crypto-grid');
     if (!grid) {
         showNotification('Grille des cryptos non trouvée', 'error');
         return;
     }
-
+    
     const cards = grid.querySelectorAll('.crypto-card');
     console.log('Cartes trouvées:', cards.length);
-
+    
     // Masquer toutes les cartes d'abord
     cards.forEach(card => {
         card.style.display = 'none';
     });
-
+    
     // Afficher seulement les favoris
     if (favorites.length === 0) {
         showNotification('Aucun favori trouvé. Cliquez sur ⭐ pour ajouter des cryptos à vos favoris !', 'info');
         cards.forEach(card => card.style.display = 'block');
         return;
     }
-
+    
     let favoritesFound = 0;
     favorites.forEach(cryptoId => {
         const card = document.getElementById(`card-${cryptoId}`);
@@ -288,19 +163,19 @@ function showFavorites() {
             favoritesFound++;
         }
     });
-
+    
     if (favoritesFound === 0) {
         showNotification('Les cryptos favorites ne sont pas encore chargées', 'warning');
         cards.forEach(card => card.style.display = 'block');
     } else {
         showNotification(`${favoritesFound} crypto(s) favorite(s) affichée(s)`, 'success');
-
+        
         // Supprimer l'ancien bouton reset s'il existe
         const existingResetBtn = document.querySelector('.favorites-reset-btn');
         if (existingResetBtn) {
             existingResetBtn.remove();
         }
-
+        
         // Bouton pour revenir à la vue complète
         const resetBtn = document.createElement('button');
         resetBtn.textContent = '↩️ Voir toutes les cryptos';
@@ -320,7 +195,7 @@ function showFavorites() {
 
 function exportData() {
     console.log('exportData appelée');
-
+    
     try {
         const dataToExport = {
             portfolio: portfolio || [],
@@ -339,11 +214,11 @@ function exportData() {
                 return acc;
             }, {})
         };
-
+        
         const dataStr = JSON.stringify(dataToExport, null, 2);
         const dataBlob = new Blob([dataStr], {type: 'application/json'});
         const url = URL.createObjectURL(dataBlob);
-
+        
         const link = document.createElement('a');
         link.href = url;
         link.download = `crypto-dashboard-export-${new Date().toISOString().slice(0, 10)}.json`;
@@ -352,7 +227,7 @@ function exportData() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-
+        
         showNotification('📊 Données exportées avec succès !', 'success');
     } catch (error) {
         console.error('Erreur lors de l\'export:', error);
@@ -364,12 +239,12 @@ function exportData() {
 async function refreshPrices() {
     const refreshBtn = document.getElementById('refresh-prices-btn');
     if (!refreshBtn) return;
-
+    
     // Animation du bouton
     refreshBtn.disabled = true;
     refreshBtn.style.transform = 'rotate(360deg)';
     refreshBtn.style.transition = 'transform 0.5s ease';
-
+    
     try {
         // Demander les données actualisées au serveur
         const response = await fetch('/api/refresh');
@@ -394,15 +269,15 @@ async function refreshPrices() {
 // ===== GESTION DES DONNÉES CRYPTO =====
 function updateCryptoData(data) {
     crypto_data = data;
-
+    
     const viewMode = document.getElementById('view-mode').value;
-
+    
     if (viewMode === 'grid') {
         updateCryptoGrid(data);
     } else if (viewMode === 'table') {
         updateCryptoTable(data);
     }
-
+    
     updateSearchResults();
     populateCompareSelectors();
 }
@@ -410,15 +285,15 @@ function updateCryptoData(data) {
 function updateCryptoGrid(data) {
     const grid = document.getElementById('crypto-grid');
     if (!grid) return;
-
+    
     for (const [cryptoId, cryptoInfo] of Object.entries(data)) {
         let card = document.getElementById(`card-${cryptoId}`);
-
+        
         if (!card) {
             card = createCryptoCard(cryptoId, cryptoInfo);
             grid.appendChild(card);
         }
-
+        
         updateCryptoCard(cryptoId, cryptoInfo);
     }
 }
@@ -426,9 +301,9 @@ function updateCryptoGrid(data) {
 function updateCryptoTable(data) {
     const tableBody = document.getElementById('crypto-table-body');
     if (!tableBody) return;
-
+    
     tableBody.innerHTML = '';
-
+    
     Object.entries(data).forEach(([cryptoId, cryptoInfo]) => {
         const row = createTableRow(cryptoId, cryptoInfo);
         tableBody.appendChild(row);
@@ -439,7 +314,7 @@ function createTableRow(cryptoId, cryptoInfo) {
     const row = document.createElement('tr');
     const current = cryptoInfo.current || {};
     const isFavorite = favorites.includes(cryptoId);
-
+    
     row.innerHTML = `
         <td>
             <button class="favorite-btn ${isFavorite ? 'active' : ''}" data-crypto="${cryptoId}">
@@ -461,36 +336,36 @@ function createTableRow(cryptoId, cryptoInfo) {
             <button class="action-btn" onclick="createAlert('${cryptoId}')">🔔</button>
         </td>
     `;
-
+    
     return row;
 }
 
 // ===== PORTFOLIO =====
 function updatePortfolioValue() {
     if (!portfolio.length) return;
-
+    
     let totalValue = 0;
     let totalChange24h = 0;
     let totalPaid = 0;
-
+    
     portfolio.forEach(holding => {
         const cryptoData = crypto_data[holding.cryptoId];
         if (cryptoData && cryptoData.current) {
             const currentPrice = cryptoData.current.usd || 0;
             const holdingValue = holding.quantity * currentPrice;
             const paidValue = holding.quantity * holding.avgPrice;
-
+            
             totalValue += holdingValue;
             totalPaid += paidValue;
-
+            
             const change24h = (cryptoData.current.usd_24h_change || 0) / 100;
             totalChange24h += holdingValue * change24h;
         }
     });
-
+    
     const totalChange = totalValue - totalPaid;
     const totalChangePercent = totalPaid > 0 ? (totalChange / totalPaid) * 100 : 0;
-
+    
     updateElement('total-portfolio-value', `$${formatPrice(totalValue)}`);
     updateElement('portfolio-24h-change', `$${formatPrice(totalChange24h)} (${(totalChange24h/totalValue*100).toFixed(2)}%)`);
     updateElement('portfolio-total-change', `$${formatPrice(totalChange)} (${totalChangePercent.toFixed(2)}%)`);
@@ -503,7 +378,7 @@ function addTransaction(transaction) {
         id: Date.now(),
         timestamp: new Date().toISOString()
     });
-
+    
     updatePortfolioFromTransactions();
     saveToLocalStorage('transactions', transactions);
     updateTransactionCount();
@@ -512,7 +387,7 @@ function addTransaction(transaction) {
 
 function updatePortfolioFromTransactions() {
     const holdings = {};
-
+    
     transactions.forEach(tx => {
         if (!holdings[tx.crypto]) {
             holdings[tx.crypto] = {
@@ -522,7 +397,7 @@ function updatePortfolioFromTransactions() {
                 avgPrice: 0
             };
         }
-
+        
         if (tx.type === 'buy') {
             holdings[tx.crypto].quantity += tx.quantity;
             holdings[tx.crypto].totalPaid += tx.quantity * tx.price + tx.fees;
@@ -530,12 +405,12 @@ function updatePortfolioFromTransactions() {
             holdings[tx.crypto].quantity -= tx.quantity;
             holdings[tx.crypto].totalPaid -= tx.quantity * holdings[tx.crypto].avgPrice;
         }
-
+        
         if (holdings[tx.crypto].quantity > 0) {
             holdings[tx.crypto].avgPrice = holdings[tx.crypto].totalPaid / holdings[tx.crypto].quantity;
         }
     });
-
+    
     portfolio = Object.values(holdings).filter(h => h.quantity > 0);
     saveToLocalStorage('portfolio', portfolio);
 }
@@ -550,7 +425,7 @@ function createAlert(cryptoId, targetPrice, condition = 'above') {
         active: true,
         createdAt: new Date().toISOString()
     };
-
+    
     alerts.push(alert);
     saveToLocalStorage('alerts', alerts);
     showNotification('Alerte créée avec succès!', 'success');
@@ -561,16 +436,16 @@ function checkPriceAlerts() {
     alerts.filter(alert => alert.active).forEach(alert => {
         const cryptoData = crypto_data[alert.cryptoId];
         if (!cryptoData || !cryptoData.current) return;
-
+        
         const currentPrice = cryptoData.current.usd;
         let triggered = false;
-
+        
         if (alert.condition === 'above' && currentPrice >= alert.targetPrice) {
             triggered = true;
         } else if (alert.condition === 'below' && currentPrice <= alert.targetPrice) {
             triggered = true;
         }
-
+        
         if (triggered) {
             showNotification(
                 `🔔 Alerte: ${formatCryptoName(alert.cryptoId)} a ${alert.condition === 'above' ? 'dépassé' : 'chuté sous'} $${alert.targetPrice}!`,
@@ -609,7 +484,7 @@ async function fetchNews() {
                 source: "Regulatory Watch"
             }
         ];
-
+        
         newsData = sampleNews;
         updateNewsDisplay();
     } catch (error) {
@@ -620,7 +495,7 @@ async function fetchNews() {
 function updateNewsDisplay() {
     const newsList = document.getElementById('news-list');
     if (!newsList) return;
-
+    
     newsList.innerHTML = newsData.map(article => `
         <div class="news-item">
             <div class="news-header">
@@ -641,17 +516,17 @@ function calculatePnL() {
     const buyPrice = parseFloat(document.getElementById('buy-price').value);
     const sellPrice = parseFloat(document.getElementById('sell-price').value);
     const quantity = parseFloat(document.getElementById('quantity').value);
-
+    
     if (!buyPrice || !sellPrice || !quantity) {
         document.getElementById('pnl-result').innerHTML = 'Veuillez remplir tous les champs';
         return;
     }
-
+    
     const buyValue = buyPrice * quantity;
     const sellValue = sellPrice * quantity;
     const pnl = sellValue - buyValue;
     const pnlPercent = (pnl / buyValue) * 100;
-
+    
     const resultClass = pnl >= 0 ? 'positive' : 'negative';
     document.getElementById('pnl-result').innerHTML = `
         <div class="pnl-breakdown">
@@ -668,9 +543,9 @@ function convertCurrency() {
     const amount = parseFloat(document.getElementById('convert-amount').value);
     const from = document.getElementById('convert-from').value;
     const to = document.getElementById('convert-to').value;
-
+    
     if (!amount || !from || !to) return;
-
+    
     // Simulation de conversion (normalement via API)
     const rates = {
         'btc': crypto_data.bitcoin?.current?.usd || 50000,
@@ -678,11 +553,11 @@ function convertCurrency() {
         'usd': 1,
         'eur': 0.85
     };
-
+    
     const fromRate = rates[from] || 1;
     const toRate = rates[to] || 1;
     const result = (amount * fromRate) / toRate;
-
+    
     document.getElementById('conversion-result').textContent = 
         `${result.toFixed(8)} ${to.toUpperCase()}`;
 }
@@ -695,7 +570,7 @@ function toggleFavorite(cryptoId) {
     } else {
         favorites.push(cryptoId);
     }
-
+    
     saveToLocalStorage('crypto-favorites', favorites);
     updateFavoriteButtons();
     showNotification(
@@ -717,20 +592,20 @@ function updateFavoriteButtons() {
 function setupSearch() {
     const searchInput = document.getElementById('crypto-search');
     const searchResults = document.getElementById('search-results');
-
+    
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase().trim();
-
+        
         if (query.length < 2) {
             searchResults.style.display = 'none';
             return;
         }
-
+        
         const matches = Object.keys(crypto_data).filter(cryptoId => 
             formatCryptoName(cryptoId).toLowerCase().includes(query) ||
             cryptoId.toLowerCase().includes(query)
         ).slice(0, 5);
-
+        
         if (matches.length > 0) {
             searchResults.innerHTML = matches.map(cryptoId => `
                 <div class="search-result-item" data-crypto="${cryptoId}">
@@ -742,7 +617,7 @@ function setupSearch() {
             searchResults.style.display = 'none';
         }
     });
-
+    
     searchResults.addEventListener('click', (e) => {
         if (e.target.classList.contains('search-result-item')) {
             const cryptoId = e.target.dataset.crypto;
@@ -764,22 +639,22 @@ function updateMarketStats() {
     let totalMarketCap = 0;
     let totalVolume = 0;
     let btcDominance = 0;
-
+    
     Object.values(crypto_data).forEach(crypto => {
         if (crypto.stats && crypto.current) {
             totalMarketCap += crypto.stats.market_cap || 0;
             totalVolume += crypto.current.usd_24h_vol || 0;
         }
     });
-
+    
     if (crypto_data.bitcoin && crypto_data.bitcoin.stats) {
         btcDominance = ((crypto_data.bitcoin.stats.market_cap || 0) / totalMarketCap) * 100;
     }
-
+    
     updateElement('total-market-cap', `$${formatPrice(totalMarketCap)}`);
     updateElement('total-volume', `$${formatPrice(totalVolume)}`);
     updateElement('btc-dominance', `${btcDominance.toFixed(1)}%`);
-
+    
     // Fear & Greed Index (simulation)
     const fearGreedValue = Math.floor(Math.random() * 100);
     updateElement('fear-greed', fearGreedValue);
@@ -789,7 +664,7 @@ function updateMarketStats() {
 function updateFearGreedIndicator(value) {
     const indicator = document.getElementById('fear-greed-indicator');
     if (!indicator) return;
-
+    
     let color, text;
     if (value <= 25) {
         color = '#f44336';
@@ -807,7 +682,7 @@ function updateFearGreedIndicator(value) {
         color = '#4caf50';
         text = 'Cupidité Extrême';
     }
-
+    
     indicator.style.background = color;
     indicator.textContent = text;
 }
@@ -816,20 +691,20 @@ function updateFearGreedIndicator(value) {
 function populateCompareSelectors() {
     const select1 = document.getElementById('compare-crypto1');
     const select2 = document.getElementById('compare-crypto2');
-
+    
     if (!select1 || !select2) return;
-
+    
     // Vider les sélecteurs
     select1.innerHTML = '<option value="">Sélectionner crypto 1</option>';
     select2.innerHTML = '<option value="">Sélectionner crypto 2</option>';
-
+    
     // Ajouter toutes les cryptos disponibles
     Object.keys(crypto_data).forEach(cryptoId => {
         const option1 = document.createElement('option');
         option1.value = cryptoId;
         option1.textContent = formatCryptoName(cryptoId);
         select1.appendChild(option1);
-
+        
         const option2 = document.createElement('option');
         option2.value = cryptoId;
         option2.textContent = formatCryptoName(cryptoId);
@@ -841,25 +716,25 @@ function compareCryptos() {
     const crypto1Id = document.getElementById('compare-crypto1').value;
     const crypto2Id = document.getElementById('compare-crypto2').value;
     const resultDiv = document.getElementById('comparison-result');
-
+    
     if (!crypto1Id || !crypto2Id) {
         showNotification('Veuillez sélectionner deux cryptos à comparer', 'warning');
         return;
     }
-
+    
     if (crypto1Id === crypto2Id) {
         showNotification('Veuillez sélectionner deux cryptos différentes', 'warning');
         return;
     }
-
+    
     const crypto1 = crypto_data[crypto1Id];
     const crypto2 = crypto_data[crypto2Id];
-
+    
     if (!crypto1 || !crypto2 || !crypto1.current || !crypto2.current) {
         showNotification('Données non disponibles pour la comparaison', 'error');
         return;
     }
-
+    
     const comparison = {
         crypto1: {
             name: formatCryptoName(crypto1Id),
@@ -878,7 +753,7 @@ function compareCryptos() {
             yearChange: crypto2.stats?.year_change || 0
         }
     };
-
+    
     resultDiv.innerHTML = `
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
             <div class="comparison-card">
@@ -947,7 +822,7 @@ function compareCryptos() {
             </div>
         </div>
     `;
-
+    
     showNotification('Comparaison générée avec succès !', 'success');
 }
 
@@ -955,35 +830,35 @@ function generateComparisonAnalysis(comparison) {
     const points = [];
     const c1 = comparison.crypto1;
     const c2 = comparison.crypto2;
-
+    
     // Comparaison des prix
     if (c1.price > c2.price) {
         points.push(`💰 ${c1.name} est ${((c1.price / c2.price - 1) * 100).toFixed(1)}% plus cher que ${c2.name}`);
     } else {
         points.push(`💰 ${c2.name} est ${((c2.price / c1.price - 1) * 100).toFixed(1)}% plus cher que ${c1.name}`);
     }
-
+    
     // Comparaison performance 24h
     if (c1.change24h > c2.change24h) {
         points.push(`📈 ${c1.name} performe mieux sur 24h (+${c1.change24h.toFixed(2)}% vs ${c2.change24h.toFixed(2)}%)`);
     } else {
         points.push(`📈 ${c2.name} performe mieux sur 24h (+${c2.change24h.toFixed(2)}% vs ${c1.change24h.toFixed(2)}%)`);
     }
-
+    
     // Comparaison volume
     if (c1.volume > c2.volume) {
         points.push(`📊 ${c1.name} a un volume de trading supérieur (${((c1.volume / c2.volume - 1) * 100).toFixed(1)}% de plus)`);
     } else {
         points.push(`📊 ${c2.name} a un volume de trading supérieur (${((c2.volume / c1.volume - 1) * 100).toFixed(1)}% de plus)`);
     }
-
+    
     // Comparaison market cap
     if (c1.marketCap > c2.marketCap) {
         points.push(`🏆 ${c1.name} a une capitalisation boursière plus élevée`);
     } else {
         points.push(`🏆 ${c2.name} a une capitalisation boursière plus élevée`);
     }
-
+    
     return points.map(point => `<div style="margin-bottom: 8px;">• ${point}</div>`).join('');
 }
 
@@ -991,7 +866,7 @@ function generateComparisonAnalysis(comparison) {
 function switchView(mode) {
     const grid = document.getElementById('crypto-grid');
     const table = document.getElementById('crypto-table');
-
+    
     if (mode === 'table') {
         grid.style.display = 'none';
         table.style.display = 'block';
@@ -1010,7 +885,7 @@ function switchSettingsTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-
+    
     document.getElementById(`${tabName}-tab`).classList.add('active');
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
 }
@@ -1027,10 +902,10 @@ function saveSettings() {
     userSettings.animationsEnabled = document.getElementById('animations-enabled').checked;
     userSettings.saveLocally = document.getElementById('save-locally').checked;
     userSettings.defaultExchange = document.getElementById('default-exchange').value;
-
+    
     saveToLocalStorage('user-settings', userSettings);
     applyTheme(userSettings.theme);
-
+    
     closeModal('settings-modal');
     showNotification('Paramètres sauvegardés !', 'success');
 }
@@ -1080,7 +955,7 @@ function formatTimeAgo(dateString) {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-
+    
     if (diffInSeconds < 60) return 'À l\'instant';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
@@ -1102,27 +977,27 @@ function showNotification(message, type = 'info') {
     const container = document.getElementById('notifications-container');
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-
+    
     const icons = {
         success: '✅',
         error: '❌',
         warning: '⚠️',
         info: 'ℹ️'
     };
-
+    
     notification.innerHTML = `
         <span class="notification-icon">${icons[type] || icons.info}</span>
         <span class="notification-message">${message}</span>
         <button class="notification-close">&times;</button>
     `;
-
+    
     container.appendChild(notification);
-
+    
     setTimeout(() => {
         notification.classList.add('fade-out');
         setTimeout(() => notification.remove(), 300);
     }, 5000);
-
+    
     notification.querySelector('.notification-close').addEventListener('click', () => {
         notification.remove();
     });
@@ -1157,9 +1032,9 @@ function createCryptoCard(cryptoId, cryptoInfo) {
     const card = document.createElement('div');
     card.className = 'crypto-card';
     card.id = `card-${cryptoId}`;
-
+    
     const isFavorite = favorites.includes(cryptoId);
-
+    
     card.innerHTML = `
         <div class="crypto-header">
             <div class="crypto-name" id="name-${cryptoId}">${formatCryptoName(cryptoId)}</div>
@@ -1209,7 +1084,7 @@ function createCryptoCard(cryptoId, cryptoInfo) {
             <button class="action-btn" onclick="openAlertModal('${cryptoId}')">🔔 Alerte</button>
         </div>
     `;
-
+    
     // Ajouter les événements
     setTimeout(() => {
         const ctx = document.getElementById(`chart-${cryptoId}`);
@@ -1222,7 +1097,7 @@ function createCryptoCard(cryptoId, cryptoInfo) {
                 currentPeriod: 'realtime'
             };
         }
-
+        
         // Gestionnaires d'événements
         const tabBtns = card.querySelectorAll('.tab-btn');
         tabBtns.forEach(btn => {
@@ -1230,18 +1105,18 @@ function createCryptoCard(cryptoId, cryptoInfo) {
                 const period = btn.dataset.period;
                 const crypto = btn.dataset.crypto;
                 switchChartPeriod(crypto, period);
-
+                
                 tabBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
             });
         });
-
+        
         const favoriteBtn = card.querySelector('.favorite-btn');
         favoriteBtn.addEventListener('click', () => {
             toggleFavorite(cryptoId);
         });
     }, 100);
-
+    
     return card;
 }
 
@@ -1249,30 +1124,30 @@ function updateCryptoCard(cryptoId, cryptoInfo) {
     const current = cryptoInfo.current;
     const stats = cryptoInfo.stats || {};
     if (!current) return;
-
+    
     updateElement(`price-${cryptoId}`, `$${formatPrice(current.usd)}`);
-
+    
     const change24h = current.usd_24h_change || 0;
     const changeElement = document.getElementById(`change-${cryptoId}`);
     if (changeElement) {
         changeElement.textContent = `${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}%`;
         changeElement.className = `change ${change24h >= 0 ? 'positive' : 'negative'}`;
     }
-
+    
     updateStatElement(`change-24h-${cryptoId}`, change24h, true);
     updateStatElement(`change-year-${cryptoId}`, stats.year_change, true);
     updateStatElement(`year-high-${cryptoId}`, stats.year_high, false, true);
     updateStatElement(`year-low-${cryptoId}`, stats.year_low, false, true);
     updateStatElement(`volume-${cryptoId}`, current.usd_24h_vol, false, true);
     updateStatElement(`market-cap-${cryptoId}`, stats.market_cap, false, true);
-
+    
     updateChart(cryptoId, cryptoInfo);
 }
 
 function updateStatElement(elementId, value, isPercentage = false, isPrice = false) {
     const element = document.getElementById(elementId);
     if (!element || value === undefined || value === null) return;
-
+    
     if (isPercentage) {
         element.textContent = `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
         element.className = `stat-value ${value >= 0 ? 'positive' : 'negative'}`;
@@ -1286,7 +1161,7 @@ function updateStatElement(elementId, value, isPercentage = false, isPrice = fal
 function switchChartPeriod(cryptoId, period) {
     const chartObj = charts[cryptoId];
     if (!chartObj) return;
-
+    
     chartObj.currentPeriod = period;
     updateChart(cryptoId, crypto_data[cryptoId] || {});
 }
@@ -1294,12 +1169,12 @@ function switchChartPeriod(cryptoId, period) {
 function updateChart(cryptoId, cryptoInfo) {
     const chartObj = charts[cryptoId];
     if (!chartObj) return;
-
+    
     const chart = chartObj.chart;
     const period = chartObj.currentPeriod || 'realtime';
-
+    
     let prices, timestamps;
-
+    
     if (period === 'historical') {
         prices = cryptoInfo.historical_prices || [];
         timestamps = cryptoInfo.historical_timestamps || [];
@@ -1307,144 +1182,56 @@ function updateChart(cryptoId, cryptoInfo) {
         prices = cryptoInfo.prices || [];
         timestamps = cryptoInfo.timestamps || [];
     }
-
+    
     if (prices.length === 0) return;
-
+    
     const maxPoints = period === 'historical' ? 100 : 50;
     const step = Math.max(1, Math.floor(prices.length / maxPoints));
-
+    
     const filteredPrices = prices.filter((_, index) => index % step === 0);
     const filteredTimestamps = timestamps.filter((_, index) => index % step === 0);
-
-    // Formatage des labels avec plus de détails
-    chart.data.labels = filteredTimestamps.map((ts, index) => {
+    
+    chart.data.labels = filteredTimestamps.map(ts => {
         const date = new Date(ts);
         if (period === 'historical') {
-            // Afficher seulement quelques labels pour éviter l'encombrement
-            if (index % Math.ceil(filteredTimestamps.length / 6) === 0) {
-                return date.toLocaleDateString('fr-FR', {
-                    month: 'short',
-                    day: 'numeric'
-                });
-            }
-            return '';
+            return date.toLocaleDateString('fr-FR', {
+                month: 'short',
+                day: 'numeric'
+            });
         } else {
-            if (index % Math.ceil(filteredTimestamps.length / 8) === 0) {
-                return date.toLocaleTimeString('fr-FR', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            }
-            return '';
+            return date.toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
         }
     });
-
+    
     chart.data.datasets[0].data = filteredPrices;
-
-    // Déterminer la tendance globale
+    
     const isUpTrend = filteredPrices.length > 1 && 
                       filteredPrices[filteredPrices.length - 1] > filteredPrices[0];
-
-    // Calculer la volatilité pour ajuster l'épaisseur de ligne
-    const volatility = calculateVolatility(filteredPrices);
-    const baseWidth = 3;
-    const dynamicWidth = Math.min(baseWidth + volatility * 2, 6);
-
-    // Couleurs et effets dynamiques basés sur la tendance
-    if (isUpTrend) {
-        chart.data.datasets[0].borderColor = createGradientBorder(chart.ctx, chart.chartArea, '#00C853', '#4CAF50');
-        chart.data.datasets[0].backgroundColor = createGradient(chart.ctx, chart.chartArea, true);
-        chart.data.datasets[0].pointBorderColor = '#00C853';
-        chart.data.datasets[0].pointBackgroundColor = '#ffffff';
-    } else {
-        chart.data.datasets[0].borderColor = createGradientBorder(chart.ctx, chart.chartArea, '#FF1744', '#f44336');
-        chart.data.datasets[0].backgroundColor = createGradient(chart.ctx, chart.chartArea, false);
-        chart.data.datasets[0].pointBorderColor = '#FF1744';
-        chart.data.datasets[0].pointBackgroundColor = '#ffffff';
-    }
-
-    chart.data.datasets[0].borderWidth = dynamicWidth;
-
-    // Mise à jour avec animation fluide
-    chart.update('active');
-
-    // Ajouter des effets de pulsation pour les points importants
-    addPulseEffect(chart, filteredPrices);
-}
-
-// Fonction pour calculer la volatilité
-function calculateVolatility(prices) {
-    if (prices.length < 2) return 0;
-
-    const changes = [];
-    for (let i = 1; i < prices.length; i++) {
-        const change = Math.abs((prices[i] - prices[i-1]) / prices[i-1]);
-        changes.push(change);
-    }
-
-    const avgChange = changes.reduce((sum, change) => sum + change, 0) / changes.length;
-    return Math.min(avgChange * 100, 1); // Normaliser entre 0 et 1
-}
-
-// Fonction pour créer des bordures dégradées
-function createGradientBorder(ctx, chartArea, startColor, endColor) {
-    if (!chartArea) return startColor;
-
-    const gradient = ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
-    gradient.addColorStop(0, startColor);
-    gradient.addColorStop(0.5, endColor);
-    gradient.addColorStop(1, startColor);
-
-    return gradient;
-}
-
-// Fonction pour ajouter des effets de pulsation
-function addPulseEffect(chart, prices) {
-    if (!prices || prices.length < 2) return;
-
-    // Identifier les points hauts et bas significatifs
-    const threshold = 0.05; // 5% de changement
-    const significantPoints = [];
-
-    for (let i = 1; i < prices.length - 1; i++) {
-        const prevChange = (prices[i] - prices[i-1]) / prices[i-1];
-        const nextChange = (prices[i+1] - prices[i]) / prices[i];
-
-        if (Math.abs(prevChange) > threshold || Math.abs(nextChange) > threshold) {
-            significantPoints.push(i);
-        }
-    }
-
-    // Animation de pulsation pour les points significatifs
-    if (userSettings.animationsEnabled && significantPoints.length > 0) {
-        setTimeout(() => {
-            chart.data.datasets[0].pointRadius = prices.map((_, index) => 
-                significantPoints.includes(index) ? 4 : 0
-            );
-            chart.update('none');
-
-            setTimeout(() => {
-                chart.data.datasets[0].pointRadius = prices.map(() => 0);
-                chart.update('none');
-            }, 1000);
-        }, 500);
-    }
+    
+    chart.data.datasets[0].borderColor = isUpTrend ? '#4CAF50' : '#f44336';
+    chart.data.datasets[0].backgroundColor = isUpTrend ? 
+        'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)';
+    
+    chart.update('none');
 }
 
 // ===== INITIALISATION =====
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard crypto Pro initialisé');
-
+    
     // Charger les données sauvegardées
     portfolio = JSON.parse(localStorage.getItem('portfolio')) || [];
     transactions = JSON.parse(localStorage.getItem('transactions')) || [];
     alerts = JSON.parse(localStorage.getItem('alerts')) || [];
-
+    
     // Initialiser les composants
     connectWebSocket();
     setupSearch();
     fetchNews();
-
+    
     // Gestionnaires d'événements pour les boutons du menu
     document.getElementById('login-btn').addEventListener('click', () => {
         if (currentUser) {
@@ -1453,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', function() {
             openModal('login-modal');
         }
     });
-
+    
     document.getElementById('profile-btn').addEventListener('click', () => openModal('profile-modal'));
     document.getElementById('settings-btn').addEventListener('click', () => {
         openModal('settings-modal');
@@ -1470,12 +1257,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('save-locally').checked = userSettings.saveLocally;
         document.getElementById('default-exchange').value = userSettings.defaultExchange;
     });
-
+    
     document.getElementById('portfolio-btn').addEventListener('click', () => openModal('portfolio-modal'));
     document.getElementById('alerts-btn').addEventListener('click', () => openModal('alerts-modal'));
     document.getElementById('news-btn').addEventListener('click', () => openModal('news-modal'));
     document.getElementById('tools-btn').addEventListener('click', () => openModal('tools-modal'));
-
+    
     // Gestionnaires pour fermer les modales
     document.querySelectorAll('.close').forEach(closeBtn => {
         closeBtn.addEventListener('click', (e) => {
@@ -1483,57 +1270,57 @@ document.addEventListener('DOMContentLoaded', function() {
             if (modal) modal.style.display = 'none';
         });
     });
-
+    
     // Fermer les modales en cliquant à l'extérieur
     window.addEventListener('click', (event) => {
         if (event.target.classList.contains('modal')) {
             event.target.style.display = 'none';
         }
     });
-
+    
     // Changement de vue
     document.getElementById('view-mode').addEventListener('change', (e) => {
         switchView(e.target.value);
     });
-
+    
     // Bouton de rafraîchissement manuel
     document.getElementById('refresh-prices-btn').addEventListener('click', refreshPrices);
-
+    
     // Boutons de la barre d'outils
     const favoritesBtn = document.getElementById('favorites-btn');
     if (favoritesBtn) {
         favoritesBtn.addEventListener('click', showFavorites);
     }
-
+    
     const compareBtn = document.getElementById('compare-btn');
     if (compareBtn) {
         compareBtn.addEventListener('click', () => openModal('compare-modal'));
     }
-
+    
     const calculatorBtn = document.getElementById('calculator-btn');
     if (calculatorBtn) {
         calculatorBtn.addEventListener('click', () => openModal('tools-modal'));
     }
-
+    
     const exportBtn = document.getElementById('export-btn');
     if (exportBtn) {
         exportBtn.addEventListener('click', exportData);
     }
-
+    
     // Onglets des paramètres
     document.querySelectorAll('.settings-tabs .tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             switchSettingsTab(btn.dataset.tab);
         });
     });
-
+    
     // Formulaires
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         handleLogin(formData.get('username'), formData.get('password'));
     });
-
+    
     document.getElementById('transaction-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -1549,43 +1336,43 @@ document.addEventListener('DOMContentLoaded', function() {
         closeModal('transaction-modal');
         e.target.reset();
     });
-
+    
     // Calculatrice P&L
     document.getElementById('calculate-pnl').addEventListener('click', calculatePnL);
-
+    
     // Convertisseur
     ['convert-amount', 'convert-from', 'convert-to'].forEach(id => {
         document.getElementById(id).addEventListener('change', convertCurrency);
     });
-
+    
     // Autres gestionnaires
     document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
     document.getElementById('add-transaction-btn').addEventListener('click', () => {
         openModal('transaction-modal');
         document.getElementById('transaction-date').value = new Date().toISOString().slice(0, 16);
     });
-
+    
     // Comparaison de cryptos
     const startCompareBtn = document.getElementById('start-compare');
     if (startCompareBtn) {
         startCompareBtn.addEventListener('click', compareCryptos);
     }
-
+    
     // Test des boutons de la barre d'outils - Debug
     console.log('Vérification des boutons:');
     console.log('Favoris:', document.getElementById('favorites-btn'));
     console.log('Comparer:', document.getElementById('compare-btn'));
     console.log('Calculatrice:', document.getElementById('calculator-btn'));
     console.log('Exporter:', document.getElementById('export-btn'));
-
+    
     // Initialiser les sélecteurs de comparaison
     populateCompareSelectors();
-
+    
     // Initialiser l'interface
     applyTheme(userSettings.theme);
     updateTransactionCount();
     updatePortfolioValue();
-
+    
     // Gestionnaires d'événements de secours pour les boutons problématiques
     setTimeout(() => {
         const buttons = [
@@ -1594,7 +1381,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'calculator-btn', action: () => openModal('tools-modal'), name: 'Calculatrice' },
             { id: 'export-btn', action: exportData, name: 'Exporter' }
         ];
-
+        
         buttons.forEach(btn => {
             const element = document.getElementById(btn.id);
             if (element && !element.hasAttribute('data-listener-added')) {
@@ -1641,7 +1428,7 @@ window.handleLogin = function(username, password) {
             memberSince: 'Janvier 2024',
             bio: 'Passionné de crypto-monnaies'
         };
-
+        
         saveToLocalStorage('current-user', currentUser);
         updateUserInterface();
         closeModal('login-modal');
@@ -1654,11 +1441,11 @@ window.handleLogin = function(username, password) {
 window.updateUserInterface = function() {
     const loginBtn = document.getElementById('login-btn');
     const profileBtn = document.getElementById('profile-btn');
-
+    
     if (currentUser) {
         loginBtn.textContent = '👤 ' + currentUser.name;
         profileBtn.style.display = 'block';
-
+        
         updateElement('profile-name', currentUser.name);
         updateElement('profile-email', currentUser.email);
         updateElement('profile-member-since', 'Membre depuis: ' + currentUser.memberSince);
