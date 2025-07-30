@@ -10,8 +10,119 @@
 </head>
 <body>
     <div class="header">
-        <h1>🚀 Crypto Trading Dashboard</h1>
+        <nav class="navbar">
+            <div class="nav-brand">
+                <h1>🚀 Crypto Trading Dashboard</h1>
+            </div>
+            <div class="nav-menu">
+                <button class="nav-btn" id="settings-btn">⚙️ Paramètres</button>
+                <button class="nav-btn" id="profile-btn">👤 Profil</button>
+                <button class="nav-btn" id="login-btn">🔐 Connexion</button>
+            </div>
+        </nav>
         <div id="status" class="status disconnected">Connexion en cours...</div>
+    </div>
+
+    <!-- Modal Login -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-login">&times;</span>
+            <h2>Connexion</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Nom d'utilisateur:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Mot de passe:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn-primary">Se connecter</button>
+                <button type="button" class="btn-secondary" id="register-btn">S'inscrire</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Profil -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-profile">&times;</span>
+            <h2>Profil Utilisateur</h2>
+            <div id="profile-view">
+                <div class="profile-info">
+                    <div class="profile-avatar">👤</div>
+                    <h3 id="profile-name">Utilisateur</h3>
+                    <p id="profile-email">email@exemple.com</p>
+                    <p id="profile-member-since">Membre depuis: Janvier 2024</p>
+                </div>
+                <button class="btn-primary" id="edit-profile-btn">Modifier le profil</button>
+                <button class="btn-secondary" id="logout-btn">Se déconnecter</button>
+            </div>
+            <div id="profile-edit" style="display: none;">
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label for="edit-name">Nom:</label>
+                        <input type="text" id="edit-name" name="name">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-email">Email:</label>
+                        <input type="email" id="edit-email" name="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-bio">Bio:</label>
+                        <textarea id="edit-bio" name="bio" placeholder="Parlez-nous de vous..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Sauvegarder</button>
+                    <button type="button" class="btn-secondary" id="cancel-edit-btn">Annuler</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Paramètres -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-settings">&times;</span>
+            <h2>Paramètres</h2>
+            <div class="settings-section">
+                <h3>Préférences d'affichage</h3>
+                <div class="form-group">
+                    <label for="theme-select">Thème:</label>
+                    <select id="theme-select">
+                        <option value="dark">Sombre</option>
+                        <option value="light">Clair</option>
+                        <option value="auto">Automatique</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="currency-select">Devise:</label>
+                    <select id="currency-select">
+                        <option value="usd">USD ($)</option>
+                        <option value="eur">EUR (€)</option>
+                        <option value="btc">BTC (₿)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="auto-refresh"> Actualisation automatique
+                    </label>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h3>Notifications</h3>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="price-alerts"> Alertes de prix
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="market-alerts"> Alertes de marché
+                    </label>
+                </div>
+            </div>
+            <button class="btn-primary" id="save-settings-btn">Sauvegarder les paramètres</button>
+        </div>
     </div>
     
     <div id="crypto-grid" class="crypto-grid">

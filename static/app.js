@@ -373,10 +373,227 @@ window.addEventListener('error', function(event) {
     console.error('Erreur JavaScript:', event.error);
 });
 
+// État utilisateur
+let currentUser = null;
+let userSettings = {
+    theme: 'dark',
+    currency: 'usd',
+    autoRefresh: true,
+    priceAlerts: false,
+    marketAlerts: false
+};
+
+// Gestion des modales
+function openModal(modalId) {
+    document.getElementById(modalId).style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Gestion du login
+function handleLogin(username, password) {
+    // Simulation d'authentification
+    if (username && password) {
+        currentUser = {
+            name: username,
+            email: `${username}@crypto-trader.com`,
+            memberSince: 'Janvier 2024',
+            bio: 'Passionné de crypto-monnaies'
+        };
+        
+        updateUserInterface();
+        closeModal('login-modal');
+        showNotification('Connexion réussie !', 'success');
+    } else {
+        showNotification('Veuillez remplir tous les champs', 'error');
+    }
+}
+
+// Mise à jour de l'interface utilisateur
+function updateUserInterface() {
+    const loginBtn = document.getElementById('login-btn');
+    const profileBtn = document.getElementById('profile-btn');
+    
+    if (currentUser) {
+        loginBtn.textContent = '👤 ' + currentUser.name;
+        profileBtn.style.display = 'block';
+        
+        // Mettre à jour les informations du profil
+        document.getElementById('profile-name').textContent = currentUser.name;
+        document.getElementById('profile-email').textContent = currentUser.email;
+        document.getElementById('profile-member-since').textContent = 'Membre depuis: ' + currentUser.memberSince;
+    } else {
+        loginBtn.textContent = '🔐 Connexion';
+        profileBtn.style.display = 'none';
+    }
+}
+
+// Gestion de l'édition du profil
+function toggleProfileEdit() {
+    const profileView = document.getElementById('profile-view');
+    const profileEdit = document.getElementById('profile-edit');
+    
+    if (profileEdit.style.display === 'none') {
+        // Passer en mode édition
+        profileView.style.display = 'none';
+        profileEdit.style.display = 'block';
+        
+        // Pré-remplir les champs
+        if (currentUser) {
+            document.getElementById('edit-name').value = currentUser.name;
+            document.getElementById('edit-email').value = currentUser.email;
+            document.getElementById('edit-bio').value = currentUser.bio || '';
+        }
+    } else {
+        // Retour à la vue
+        profileView.style.display = 'block';
+        profileEdit.style.display = 'none';
+    }
+}
+
+// Sauvegarder le profil
+function saveProfile(formData) {
+    if (currentUser) {
+        currentUser.name = formData.get('name');
+        currentUser.email = formData.get('email');
+        currentUser.bio = formData.get('bio');
+        
+        updateUserInterface();
+        toggleProfileEdit();
+        showNotification('Profil mis à jour !', 'success');
+    }
+}
+
+// Déconnexion
+function logout() {
+    currentUser = null;
+    updateUserInterface();
+    closeModal('profile-modal');
+    showNotification('Déconnexion réussie', 'info');
+}
+
+// Sauvegarder les paramètres
+function saveSettings() {
+    userSettings.theme = document.getElementById('theme-select').value;
+    userSettings.currency = document.getElementById('currency-select').value;
+    userSettings.autoRefresh = document.getElementById('auto-refresh').checked;
+    userSettings.priceAlerts = document.getElementById('price-alerts').checked;
+    userSettings.marketAlerts = document.getElementById('market-alerts').checked;
+    
+    // Appliquer le thème
+    applyTheme(userSettings.theme);
+    
+    closeModal('settings-modal');
+    showNotification('Paramètres sauvegardés !', 'success');
+}
+
+// Appliquer le thème
+function applyTheme(theme) {
+    document.body.className = theme === 'light' ? 'light-theme' : 'dark-theme';
+}
+
+// Afficher une notification
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        z-index: 1001;
+        animation: slideIn 0.3s ease;
+    `;
+    
+    switch(type) {
+        case 'success':
+            notification.style.background = 'linear-gradient(135deg, #4CAF50, #66BB6A)';
+            break;
+        case 'error':
+            notification.style.background = 'linear-gradient(135deg, #f44336, #EF5350)';
+            break;
+        default:
+            notification.style.background = 'linear-gradient(135deg, #2196F3, #42A5F5)';
+    }
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
 // Initialisation
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard crypto initialisé');
     connectWebSocket();
+    
+    // Gestionnaires d'événements pour les boutons du menu
+    document.getElementById('login-btn').addEventListener('click', () => {
+        if (currentUser) {
+            openModal('profile-modal');
+        } else {
+            openModal('login-modal');
+        }
+    });
+    
+    document.getElementById('profile-btn').addEventListener('click', () => {
+        openModal('profile-modal');
+    });
+    
+    document.getElementById('settings-btn').addEventListener('click', () => {
+        openModal('settings-modal');
+        // Charger les paramètres actuels
+        document.getElementById('theme-select').value = userSettings.theme;
+        document.getElementById('currency-select').value = userSettings.currency;
+        document.getElementById('auto-refresh').checked = userSettings.autoRefresh;
+        document.getElementById('price-alerts').checked = userSettings.priceAlerts;
+        document.getElementById('market-alerts').checked = userSettings.marketAlerts;
+    });
+    
+    // Gestionnaires pour fermer les modales
+    document.getElementById('close-login').addEventListener('click', () => closeModal('login-modal'));
+    document.getElementById('close-profile').addEventListener('click', () => closeModal('profile-modal'));
+    document.getElementById('close-settings').addEventListener('click', () => closeModal('settings-modal'));
+    
+    // Fermer les modales en cliquant à l'extérieur
+    window.addEventListener('click', (event) => {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    });
+    
+    // Formulaire de connexion
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        handleLogin(formData.get('username'), formData.get('password'));
+    });
+    
+    // Édition du profil
+    document.getElementById('edit-profile-btn').addEventListener('click', toggleProfileEdit);
+    document.getElementById('cancel-edit-btn').addEventListener('click', toggleProfileEdit);
+    
+    document.getElementById('profile-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        saveProfile(formData);
+    });
+    
+    // Déconnexion
+    document.getElementById('logout-btn').addEventListener('click', logout);
+    
+    // Sauvegarder les paramètres
+    document.getElementById('save-settings-btn').addEventListener('click', saveSettings);
+    
+    // Initialiser l'interface utilisateur
+    updateUserInterface();
 });
 
 // Gestion de la visibilité de la page pour économiser les ressources
