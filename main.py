@@ -21,7 +21,12 @@ connections: List[WebSocket] = []
 crypto_data: Dict = {}
 
 # Liste des cryptos à suivre
-CRYPTOS = ["bitcoin", "ethereum", "binancecoin", "cardano", "solana", "dogecoin", "polygon"]
+CRYPTOS = [
+    "bitcoin", "ethereum", "binancecoin", "cardano", "solana", "dogecoin", 
+    "polygon", "chainlink", "litecoin", "avalanche-2", "uniswap", "polkadot",
+    "near", "cosmos", "algorand", "tron", "stellar", "filecoin", "vechain",
+    "hedera-hashgraph", "internet-computer", "the-sandbox"
+]
 
 async def fetch_historical_data():
     """Récupère les données historiques d'une année pour toutes les cryptos"""

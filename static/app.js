@@ -220,7 +220,22 @@ function formatCryptoName(cryptoId) {
         'cardano': 'Cardano (ADA)',
         'solana': 'Solana (SOL)',
         'dogecoin': 'Dogecoin (DOGE)',
-        'polygon': 'Polygon (MATIC)'
+        'polygon': 'Polygon (MATIC)',
+        'chainlink': 'Chainlink (LINK)',
+        'litecoin': 'Litecoin (LTC)',
+        'avalanche-2': 'Avalanche (AVAX)',
+        'uniswap': 'Uniswap (UNI)',
+        'polkadot': 'Polkadot (DOT)',
+        'near': 'NEAR Protocol (NEAR)',
+        'cosmos': 'Cosmos (ATOM)',
+        'algorand': 'Algorand (ALGO)',
+        'tron': 'TRON (TRX)',
+        'stellar': 'Stellar (XLM)',
+        'filecoin': 'Filecoin (FIL)',
+        'vechain': 'VeChain (VET)',
+        'hedera-hashgraph': 'Hedera (HBAR)',
+        'internet-computer': 'Internet Computer (ICP)',
+        'the-sandbox': 'The Sandbox (SAND)'
     };
     return names[cryptoId] || cryptoId.charAt(0).toUpperCase() + cryptoId.slice(1);
 }
